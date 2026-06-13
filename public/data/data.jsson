@@ -1,0 +1,70 @@
+{
+  "javascript": {
+    "intro-js": {
+      "title": "Introduction to JavaScript",
+      "module": "Getting Started",
+      "duration": "15 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">What is JavaScript?</h3>\n<p class=\"text-muted-foreground mb-4\">\n    JavaScript is a versatile, high-level programming language that runs in web browsers and on servers. It's the cornerstone of interactive web development.\n</p>\n<h4 class=\"text-xl font-bold text-foreground mb-3 mt-6\">Why Learn JavaScript?</h4>\n<ul class=\"list-disc list-inside space-y-2 text-muted-foreground mb-6\">\n    <li>Essential for web development</li>\n    <li>Used in both frontend and backend (Node.js)</li>\n    <li>Powers interactive web applications</li>\n    <li>High demand in job market</li>\n</ul>"
+    },
+    "variables-types": {
+      "title": "Variables & Data Types",
+      "module": "Fundamentals",
+      "duration": "20 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">Understanding Variables</h3>\n<p class=\"text-muted-foreground mb-4\">\n    Variables are containers for storing data values. JavaScript uses const, let, and var for declarations.\n</p>\n<h4 class=\"text-xl font-bold text-foreground mb-3 mt-6\">Data Types</h4>\n<ul class=\"list-disc list-inside space-y-2 text-muted-foreground mb-6\">\n    <li>Primitive: number, string, boolean, null, undefined</li>\n    <li>Complex: object, array, function</li>\n</ul>"
+    },
+    "functions": {
+      "title": "Functions & Scope",
+      "module": "Intermediate",
+      "duration": "30 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">Understanding Functions</h3>\n<p class=\"text-muted-foreground mb-4\">\n    Functions are reusable blocks of code that perform specific tasks.\n</p>\n<h4 class=\"text-xl font-bold text-foreground mb-3 mt-6\">Key Concepts</h4>\n<ul class=\"list-disc list-inside space-y-2 text-muted-foreground mb-6\">\n    <li>Function declarations</li>\n    <li>Arrow functions (ES6)</li>\n    <li>Function scope and block scope</li>\n</ul>"
+    },
+    "async": {
+      "title": "Async & Promises",
+      "module": "Intermediate",
+      "duration": "38 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">Asynchronous JavaScript</h3>\n<p class=\"text-muted-foreground mb-4\">\n    Asynchronous code allows your program to perform long-running operations without blocking user interaction.\n</p>"
+    }
+  },
+  "react": {
+    "react-intro": {
+      "title": "React Fundamentals",
+      "module": "Getting Started",
+      "duration": "20 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">Introduction to React</h3>\n<p class=\"text-muted-foreground mb-4\">\n    React is a JavaScript library for building user interfaces with reusable components.\n</p>"
+    },
+    "hooks": {
+      "title": "React Hooks",
+      "module": "Intermediate",
+      "duration": "35 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">Understanding Hooks</h3>\n<p class=\"text-muted-foreground mb-4\">\n    Hooks are functions that let you use state and other React features in functional components.\n</p>"
+    }
+  },
+  "nextjs": {
+    "nextjs-intro": {
+      "title": "Next.js Fundamentals",
+      "module": "Getting Started",
+      "duration": "20 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">Introduction to Next.js</h3>\n<p class=\"text-muted-foreground mb-4\">\n    Next.js is a React framework that enables full-stack web applications with serverless functions.\n</p>"
+    },
+    "routing": {
+      "title": "App Router",
+      "module": "Fundamentals",
+      "duration": "25 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">Next.js App Router</h3>\n<p class=\"text-muted-foreground mb-4\">\n    The App Router is Next.js's file-based routing system for modern web applications.\n</p>"
+    }
+  },
+  "typescript": {
+    "ts-intro": {
+      "title": "TypeScript Basics",
+      "module": "Getting Started",
+      "duration": "20 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">What is TypeScript?</h3>\n<p class=\"text-muted-foreground mb-4\">\n    TypeScript is a typed superset of JavaScript that compiles to plain JavaScript.\n</p>"
+    },
+    "types": {
+      "title": "Types & Interfaces",
+      "module": "Fundamentals",
+      "duration": "28 min",
+      "content": "<h3 class=\"text-2xl font-bold text-foreground mb-4\">TypeScript Types</h3>\n<p class=\"text-muted-foreground mb-4\">\n    Learn about basic types and how to create interfaces for type safety.\n</p>"
+    }
+  }
+}
