@@ -4,96 +4,193 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 export default async function HomePage() {
-  // دریافت ۴ درس آخر از دیتابیس برای بخش آموزش‌های ویژه
-  const { data: latestLessons } = await supabase
-    .from('lessons')
+  // تلاش اول: از ویو v_lessons_full بخوانیم (جدید)
+  // اگر ویو وجود نداشت یا خالی بود، از lessons مستقیم
+  let latestLessons: any[] | null = null;
+  let latestError: any = null;
+
+  const { data: fromView, error: viewError } = await supabase
+    .from('v_lessons_full')
     .select('*')
-    .order('id', { ascending: false })
+    .eq('status', 'published')
+    .order('published_at', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: false })
     .limit(4);
 
-  // دسته‌بندی‌ها (اطلاعات پایه ثابت می‌مانند اما لینک‌دار می‌شوند)
-  const categories = [
-    {
-      icon: Code2,
-      title: 'JavaScript',
-      slug: 'javascript',
-      description: 'Master vanilla JS from basics to advanced concepts',
-      color: 'from-yellow-500/20 to-yellow-600/20'
-    },
-    {
-      icon: Rocket,
-      title: 'React.js',
-      slug: 'react',
-      description: 'Build interactive UIs with React components and hooks',
-      color: 'from-cyan-500/20 to-blue-600/20'
-    },
-    {
-      icon: BookOpen,
-      title: 'Next.js',
-      slug: 'nextjs',
-      description: 'Full-stack framework for production apps',
-      color: 'from-gray-500/20 to-gray-700/20'
-    },
-    {
-      icon: Code2,
-      title: 'TypeScript',
-      slug: 'typescript',
-      description: 'Type-safe JavaScript for scalable applications',
-      color: 'from-blue-500/20 to-blue-600/20'
-    },
-    {
-      icon: Rocket,
-      title: 'HTML & CSS',
-      slug: 'html-css',
-      description: 'Web fundamentals and responsive design',
-      color: 'from-orange-500/20 to-red-600/20'
-    },
-    {
-      icon: Users,
-      title: 'Web Basics',
-      slug: 'web-basics',
-      description: 'Internet, browsers, and how the web works',
-      color: 'from-green-500/20 to-emerald-600/20'
-    }
-  ];
+  if (fromView && fromView.length > 0) {
+    latestLessons = fromView;
+  } else {
+    // fallback: جدول lessons با اسکیمای جدید
+    const { data: fromLessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select(`
+        id, slug, title, summary, duration_minutes, status, is_featured, published_at, updated_at,
+        subject_id,
+        subjects!lessons_subject_id_fkey ( slug, title ),
+        chapters!lessons_chapter_id_fkey ( slug, title )
+      `)
+      .eq('status', 'published')
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(4);
 
-  // تبدیل دیتای دیتابیس به فرمت مورد نیاز دیزاین شما
-  // اگر دیتابیس خالی بود، از چند دیتای فیک به عنوان بک‌آپ استفاده می‌کنیم تا دیزاین خراب نشود
-  const featuredTutorials = latestLessons && latestLessons.length > 0 
-    ? latestLessons.map((lesson, index) => {
-        // اختصاص رنگ‌های تصادفی یا بر اساس ایندکس برای زیبایی کارت‌ها
-        const bgColors = ['bg-yellow-100', 'bg-cyan-100', 'bg-gray-200', 'bg-blue-100'];
+    if (fromLessons && fromLessons.length > 0) {
+      // نرمال‌سازی به شکل v_lessons_full
+      latestLessons = fromLessons.map((l: any) => ({
+        ...l,
+        subject_slug: l.subjects?.slug || l.subject_slug || 'c',
+        subject_title: l.subjects?.title || l.subject_title || '',
+        chapter_slug: l.chapters?.slug || l.chapter_slug || '',
+      }));
+    } else {
+      latestError = viewError || lessonsError;
+      // آخرین تلاش: اسکیمای قدیمی با tech_slug / lesson_slug (برای سازگاری)
+      const { data: legacy } = await supabase
+        .from('lessons')
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(4);
+      if (legacy && legacy.length > 0 && legacy[0].tech_slug) {
+        latestLessons = legacy.map((l: any) => ({
+          id: l.id,
+          title: l.title,
+          slug: l.lesson_slug,
+          subject_slug: l.tech_slug,
+          summary: l.module,
+          duration_minutes: parseInt(l.duration) || 20,
+          status: 'published',
+        }));
+      }
+    }
+  }
+
+  // موضوعات (subjects) را از دیتابیس بگیر - اگر نبود fallback به هاردکد
+  let dbSubjects: any[] = [];
+  const { data: subjectsData } = await supabase
+    .from('subjects')
+    .select('*')
+    .eq('is_published', true)
+    .order('order_index', { ascending: true });
+
+  if (subjectsData && subjectsData.length > 0) {
+    dbSubjects = subjectsData;
+  }
+
+  // اگر دیتابیس موضوع داشت، از آن برای کارت‌های دسته‌بندی استفاده کن
+  const categories = dbSubjects.length > 0
+    ? dbSubjects.map((s: any) => {
+        const iconMap: Record<string, any> = {
+          programming: Code2,
+          math: BookOpen,
+          physics: Rocket,
+          other: BookOpen,
+        };
+        const colorMap: Record<string, string> = {
+          blue: 'from-blue-500/20 to-blue-600/20',
+          cyan: 'from-cyan-500/20 to-blue-600/20',
+          gray: 'from-gray-500/20 to-gray-700/20',
+          yellow: 'from-yellow-500/20 to-yellow-600/20',
+          violet: 'from-violet-500/20 to-purple-600/20',
+          emerald: 'from-emerald-500/20 to-green-600/20',
+          orange: 'from-orange-500/20 to-red-600/20',
+        };
         return {
-          id: lesson.id,
-          title: lesson.title,
-          category: lesson.tech_slug,
-          level: lesson.module || 'Beginner',
-          rating: 4.9, // این موارد چون در دیتابیس نیستند فعلا ثابت می‌مانند
-          students: 1200 + (index * 400),
-          duration: lesson.duration || '20 min',
-          image: bgColors[index % bgColors.length],
-          href: `/tutorials/${lesson.tech_slug}/${lesson.lesson_slug}`
+          icon: iconMap[s.kind] || Code2,
+          title: s.title,
+          slug: s.slug,
+          description: s.description || '',
+          color: colorMap[s.color] || 'from-blue-500/20 to-cyan-600/20',
+          kind: s.kind,
         };
       })
-    : [];
+    : [
+        {
+          icon: Code2,
+          title: 'زبان C',
+          slug: 'c',
+          description: 'از صفر تا اشاره‌گرها؛ یادداشت‌های یادگیری زبان C',
+          color: 'from-blue-500/20 to-blue-600/20',
+        },
+        {
+          icon: BookOpen,
+          title: 'ریاضی',
+          slug: 'math',
+          description: 'حد، مشتق و انتگرال با فرمول‌نویسی',
+          color: 'from-violet-500/20 to-purple-600/20',
+        },
+        {
+          icon: Rocket,
+          title: 'فیزیک',
+          slug: 'physics',
+          description: 'مکانیک و الکتریسیته با مثال',
+          color: 'from-emerald-500/20 to-green-600/20',
+        },
+        {
+          icon: Code2,
+          title: 'JavaScript',
+          slug: 'javascript',
+          description: 'Master vanilla JS from basics to advanced concepts',
+          color: 'from-yellow-500/20 to-yellow-600/20',
+        },
+        {
+          icon: Rocket,
+          title: 'React.js',
+          slug: 'react',
+          description: 'Build interactive UIs with React components and hooks',
+          color: 'from-cyan-500/20 to-blue-600/20',
+        },
+        {
+          icon: BookOpen,
+          title: 'Next.js',
+          slug: 'nextjs',
+          description: 'Full-stack framework for production apps',
+          color: 'from-gray-500/20 to-gray-700/20',
+        },
+      ];
+
+  const featuredTutorials =
+    latestLessons && latestLessons.length > 0
+      ? latestLessons.map((lesson: any, index: number) => {
+          const bgColors = ['bg-yellow-100', 'bg-cyan-100', 'bg-gray-200', 'bg-blue-100', 'bg-violet-100', 'bg-emerald-100'];
+          const subjectSlug = lesson.subject_slug || lesson.subjects?.slug || lesson.tech_slug || 'c';
+          const lessonSlug = lesson.slug || lesson.lesson_slug;
+          const duration = lesson.duration_minutes
+            ? `${lesson.duration_minutes} دقیقه`
+            : lesson.duration || '20 دقیقه';
+
+          return {
+            id: lesson.id,
+            title: lesson.title,
+            category: lesson.subject_title || subjectSlug,
+            level: lesson.summary ? lesson.summary.slice(0, 30) : 'مقدماتی',
+            rating: 4.9,
+            students: 1200 + index * 400,
+            duration,
+            image: bgColors[index % bgColors.length],
+            href: `/tutorials/${subjectSlug}/${lessonSlug}`,
+          };
+        })
+      : [];
 
   const learningPaths = [
     {
       title: 'Frontend Developer',
       steps: ['HTML & CSS', 'JavaScript', 'React.js', 'Next.js'],
-      duration: '24 weeks'
+      duration: '24 weeks',
     },
     {
       title: 'Full-Stack Developer',
       steps: ['Web Basics', 'JavaScript', 'React.js', 'Next.js', 'Backend'],
-      duration: '32 weeks'
+      duration: '32 weeks',
     },
     {
       title: 'React Expert',
       steps: ['JavaScript', 'React.js', 'State Management', 'Testing'],
-      duration: '16 weeks'
-    }
+      duration: '16 weeks',
+    },
   ];
+
+  const hasSupabaseError = !!latestError && (!latestLessons || latestLessons.length === 0);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background via-background to-card/30" dir="ltr">
@@ -138,10 +235,19 @@ export default async function HomePage() {
               <p className="text-muted-foreground">Students Learning</p>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-1">6</div>
+              <div className="text-3xl font-bold text-primary mb-1">{dbSubjects.length || 6}</div>
               <p className="text-muted-foreground">Topics Covered</p>
             </div>
           </div>
+
+          {hasSupabaseError && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-8 text-sm text-yellow-700 dark:text-yellow-300">
+              <strong>هشدار:</strong> اتصال به Supabase برقرار نشد یا داده‌ای برنگشت. <br />
+              بررسی کن: <code className="bg-black/10 px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code> و{' '}
+              <code className="bg-black/10 px-1 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> در <code>.env.local</code> ست شده باشد،
+              و RLS و seed.sql اجرا شده باشد. خطا: {latestError?.message || 'no data'}
+            </div>
+          )}
         </div>
       </section>
 
@@ -177,7 +283,7 @@ export default async function HomePage() {
                       </div>
                     </div>
                     <h3 className="text-2xl font-bold text-foreground mb-2">{cat.title}</h3>
-                    <p className="text-muted-foreground mb-4">{cat.description}</p>
+                    <p className="text-muted-foreground mb-4 line-clamp-2">{cat.description}</p>
                     <span className="inline-flex items-center gap-2 text-primary font-semibold group-hover:translate-x-1 transition-transform mt-auto">
                       Explore <ArrowRight size={16} />
                     </span>
@@ -190,14 +296,14 @@ export default async function HomePage() {
       </section>
 
       {/* Featured Tutorials (Dynamic from DB) */}
-      {featuredTutorials.length > 0 && (
+      {featuredTutorials.length > 0 ? (
         <section className="px-4 sm:px-6 lg:px-8 mb-20">
           <div className="mx-auto max-w-6xl">
             <div className="flex items-center justify-between mb-12">
               <h2 className="text-3xl font-bold text-foreground">Featured Tutorials</h2>
-              <button className="text-primary font-semibold flex items-center gap-2 hover:translate-x-1 transition-transform">
+              <Link href="/learning-paths" className="text-primary font-semibold flex items-center gap-2 hover:translate-x-1 transition-transform">
                 View All <ArrowRight size={18} />
-              </button>
+              </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredTutorials.map((tutorial) => (
@@ -209,9 +315,7 @@ export default async function HomePage() {
                         <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded">
                           {tutorial.category}
                         </span>
-                        <span className="text-xs font-semibold text-muted-foreground">
-                          {tutorial.level}
-                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground truncate">{tutorial.level}</span>
                       </div>
                       <h3 className="font-bold text-foreground mb-3 line-clamp-2 group-hover:text-primary transition-colors">
                         {tutorial.title}
@@ -237,6 +341,18 @@ export default async function HomePage() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="px-4 sm:px-6 lg:px-8 mb-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="bg-card border border-dashed border-border rounded-xl p-12 text-center">
+              <BookOpen className="mx-auto mb-4 text-muted-foreground" size={32} />
+              <h3 className="font-bold text-foreground mb-2">هنوز درسی منتشر نشده</h3>
+              <p className="text-muted-foreground text-sm">
+                اگر Supabase را تازه ساختی، فایل <code>supabase/schema.sql</code> و بعد <code>supabase/seed.sql</code> را در SQL Editor اجرا کن.
+              </p>
             </div>
           </div>
         </section>

@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import Header from "@/components/home/Header";
 import Footer from "@/components/home/Footer";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+// برای محیط‌هایی که اینترنت ندارند (مثل CI) فونت گوگل را غیرفعال می‌کنیم
+// تا بیلد نشکند. اگر اینترنت باشد، می‌توان دوباره Geist را فعال کرد.
+const geist = { variable: "" };
 
 export const metadata: Metadata = {
   title: "DevTutorials - Learn Web Development",
