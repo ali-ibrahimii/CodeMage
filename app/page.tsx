@@ -1,407 +1,282 @@
-// app/page.tsx
-import { Search, ArrowRight, Star, Clock, BookOpen, Code2, Rocket, Users } from 'lucide-react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import type { CSSProperties } from 'react';
+import {
+  ArrowLeft,
+  ArrowUpLeft,
+  Atom,
+  BookOpen,
+  Braces,
+  Check,
+  Clock3,
+  Code2,
+  Compass,
+  GraduationCap,
+  Layers3,
+  Play,
+  Rocket,
+  Sparkles,
+  Sigma,
+  Terminal,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { getLatestLessons, getPublicSettings, getPublicStats, getPublicSubjects } from '@/lib/content';
+import type { PublicLesson, PublicSubject } from '@/lib/content';
 
-export default async function HomePage() {
-  // تلاش اول: از ویو v_lessons_full بخوانیم (جدید)
-  // اگر ویو وجود نداشت یا خالی بود، از lessons مستقیم
-  let latestLessons: any[] | null = null;
-  let latestError: any = null;
+export const dynamic = 'force-dynamic';
 
-  const { data: fromView, error: viewError } = await supabase
-    .from('v_lessons_full')
-    .select('*')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false, nullsFirst: false })
-    .order('updated_at', { ascending: false })
-    .limit(4);
+const iconByName: Record<string, LucideIcon> = {
+  Braces,
+  Code2,
+  Atom,
+  Sigma,
+  BookOpen,
+  Rocket,
+  GraduationCap,
+};
 
-  if (fromView && fromView.length > 0) {
-    latestLessons = fromView;
-  } else {
-    // fallback: جدول lessons با اسکیمای جدید
-    const { data: fromLessons, error: lessonsError } = await supabase
-      .from('lessons')
-      .select(`
-        id, slug, title, summary, duration_minutes, status, is_featured, published_at, updated_at,
-        subject_id,
-        subjects!lessons_subject_id_fkey ( slug, title ),
-        chapters!lessons_chapter_id_fkey ( slug, title )
-      `)
-      .eq('status', 'published')
-      .order('published_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(4);
+const artByColor: Record<string, { start: string; end: string; icon: string }> = {
+  blue: { start: '#c8d8ff', end: '#e6eaff', icon: '#4f62db' },
+  cyan: { start: '#c4f0ee', end: '#e4f8fa', icon: '#219c9c' },
+  violet: { start: '#ded2ff', end: '#f0e9ff', icon: '#7c5cda' },
+  emerald: { start: '#c5efd9', end: '#e8f8ee', icon: '#258c62' },
+  yellow: { start: '#f8e6ad', end: '#fbf5d9', icon: '#b88923' },
+  orange: { start: '#ffd7c2', end: '#fff0e6', icon: '#d57a4a' },
+  gray: { start: '#d9e0ec', end: '#f0f2f7', icon: '#6c778a' },
+};
 
-    if (fromLessons && fromLessons.length > 0) {
-      // نرمال‌سازی به شکل v_lessons_full
-      latestLessons = fromLessons.map((l: any) => ({
-        ...l,
-        subject_slug: l.subjects?.slug || l.subject_slug || 'c',
-        subject_title: l.subjects?.title || l.subject_title || '',
-        chapter_slug: l.chapters?.slug || l.chapter_slug || '',
-      }));
-    } else {
-      latestError = viewError || lessonsError;
-      // آخرین تلاش: اسکیمای قدیمی با tech_slug / lesson_slug (برای سازگاری)
-      const { data: legacy } = await supabase
-        .from('lessons')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(4);
-      if (legacy && legacy.length > 0 && legacy[0].tech_slug) {
-        latestLessons = legacy.map((l: any) => ({
-          id: l.id,
-          title: l.title,
-          slug: l.lesson_slug,
-          subject_slug: l.tech_slug,
-          summary: l.module,
-          duration_minutes: parseInt(l.duration) || 20,
-          status: 'published',
-        }));
-      }
-    }
-  }
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('fa-IR').format(value);
+}
 
-  // موضوعات (subjects) را از دیتابیس بگیر - اگر نبود fallback به هاردکد
-  let dbSubjects: any[] = [];
-  const { data: subjectsData } = await supabase
-    .from('subjects')
-    .select('*')
-    .eq('is_published', true)
-    .order('order_index', { ascending: true });
+function safeHref(value: string | undefined, fallback: string) {
+  return value?.startsWith('/') ? value : fallback;
+}
 
-  if (subjectsData && subjectsData.length > 0) {
-    dbSubjects = subjectsData;
-  }
-
-  // اگر دیتابیس موضوع داشت، از آن برای کارت‌های دسته‌بندی استفاده کن
-  const categories = dbSubjects.length > 0
-    ? dbSubjects.map((s: any) => {
-        const iconMap: Record<string, any> = {
-          programming: Code2,
-          math: BookOpen,
-          physics: Rocket,
-          other: BookOpen,
-        };
-        const colorMap: Record<string, string> = {
-          blue: 'from-blue-500/20 to-blue-600/20',
-          cyan: 'from-cyan-500/20 to-blue-600/20',
-          gray: 'from-gray-500/20 to-gray-700/20',
-          yellow: 'from-yellow-500/20 to-yellow-600/20',
-          violet: 'from-violet-500/20 to-purple-600/20',
-          emerald: 'from-emerald-500/20 to-green-600/20',
-          orange: 'from-orange-500/20 to-red-600/20',
-        };
-        return {
-          icon: iconMap[s.kind] || Code2,
-          title: s.title,
-          slug: s.slug,
-          description: s.description || '',
-          color: colorMap[s.color] || 'from-blue-500/20 to-cyan-600/20',
-          kind: s.kind,
-        };
-      })
-    : [
-        {
-          icon: Code2,
-          title: 'زبان C',
-          slug: 'c',
-          description: 'از صفر تا اشاره‌گرها؛ یادداشت‌های یادگیری زبان C',
-          color: 'from-blue-500/20 to-blue-600/20',
-        },
-        {
-          icon: BookOpen,
-          title: 'ریاضی',
-          slug: 'math',
-          description: 'حد، مشتق و انتگرال با فرمول‌نویسی',
-          color: 'from-violet-500/20 to-purple-600/20',
-        },
-        {
-          icon: Rocket,
-          title: 'فیزیک',
-          slug: 'physics',
-          description: 'مکانیک و الکتریسیته با مثال',
-          color: 'from-emerald-500/20 to-green-600/20',
-        },
-        {
-          icon: Code2,
-          title: 'JavaScript',
-          slug: 'javascript',
-          description: 'Master vanilla JS from basics to advanced concepts',
-          color: 'from-yellow-500/20 to-yellow-600/20',
-        },
-        {
-          icon: Rocket,
-          title: 'React.js',
-          slug: 'react',
-          description: 'Build interactive UIs with React components and hooks',
-          color: 'from-cyan-500/20 to-blue-600/20',
-        },
-        {
-          icon: BookOpen,
-          title: 'Next.js',
-          slug: 'nextjs',
-          description: 'Full-stack framework for production apps',
-          color: 'from-gray-500/20 to-gray-700/20',
-        },
-      ];
-
-  const featuredTutorials =
-    latestLessons && latestLessons.length > 0
-      ? latestLessons.map((lesson: any, index: number) => {
-          const bgColors = ['bg-yellow-100', 'bg-cyan-100', 'bg-gray-200', 'bg-blue-100', 'bg-violet-100', 'bg-emerald-100'];
-          const subjectSlug = lesson.subject_slug || lesson.subjects?.slug || lesson.tech_slug || 'c';
-          const lessonSlug = lesson.slug || lesson.lesson_slug;
-          const duration = lesson.duration_minutes
-            ? `${lesson.duration_minutes} دقیقه`
-            : lesson.duration || '20 دقیقه';
-
-          return {
-            id: lesson.id,
-            title: lesson.title,
-            category: lesson.subject_title || subjectSlug,
-            level: lesson.summary ? lesson.summary.slice(0, 30) : 'مقدماتی',
-            rating: 4.9,
-            students: 1200 + index * 400,
-            duration,
-            image: bgColors[index % bgColors.length],
-            href: `/tutorials/${subjectSlug}/${lessonSlug}`,
-          };
-        })
-      : [];
-
-  const learningPaths = [
-    {
-      title: 'Frontend Developer',
-      steps: ['HTML & CSS', 'JavaScript', 'React.js', 'Next.js'],
-      duration: '24 weeks',
-    },
-    {
-      title: 'Full-Stack Developer',
-      steps: ['Web Basics', 'JavaScript', 'React.js', 'Next.js', 'Backend'],
-      duration: '32 weeks',
-    },
-    {
-      title: 'React Expert',
-      steps: ['JavaScript', 'React.js', 'State Management', 'Testing'],
-      duration: '16 weeks',
-    },
-  ];
-
-  const hasSupabaseError = !!latestError && (!latestLessons || latestLessons.length === 0);
+function LessonCard({ lesson, index }: { lesson: PublicLesson; index: number }) {
+  const art = artByColor[lesson.subject_color || 'violet'] || artByColor.violet;
+  const Icon = iconByName[lesson.subject_icon || ''] || Code2;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-card/30" dir="ltr">
-      {/* Hero Section */}
-      <section className="relative px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid lg:grid-cols-2 gap-12 items-center mb-12">
-            <div>
-              <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground mb-6 leading-tight">
-                Learn to Code, <span className="text-primary">Master Web Dev</span>
+    <Link href={`/tutorials/${lesson.subject_slug || 'c'}/${lesson.slug}`} className="group block h-full">
+      <article className="soft-card card-hover h-full overflow-hidden">
+        <div
+          className="subject-art relative flex h-36 items-end justify-between overflow-hidden p-5"
+          style={{ '--art-start': art.start, '--art-end': art.end } as CSSProperties}
+        >
+          <div className="absolute -left-5 -top-10 size-36 rounded-full border border-white/40 opacity-60" />
+          <div className="absolute -left-1 top-1 size-24 rounded-full border border-white/50 opacity-50" />
+          <div className="relative flex size-12 items-center justify-center rounded-2xl bg-white/75 text-[color:var(--lesson-icon)] shadow-sm backdrop-blur" style={{ '--lesson-icon': art.icon } as CSSProperties}>
+            <Icon size={23} strokeWidth={1.8} />
+          </div>
+          <span className="relative rounded-full border border-white/50 bg-white/65 px-3 py-1 text-[11px] font-bold text-slate-700 backdrop-blur">
+            {lesson.subject_title || 'درس تازه'}
+          </span>
+          <span className="absolute right-5 top-5 text-[10px] font-bold tracking-[0.22em] text-slate-500/75">LESSON {String(index + 1).padStart(2, '0')}</span>
+        </div>
+        <div className="p-5 sm:p-6">
+          <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><Clock3 size={13} /> {formatNumber(lesson.duration_minutes || 20)} دقیقه</span>
+            {lesson.is_featured && <span className="rounded-full bg-[#b7f486]/35 px-2.5 py-1 font-bold text-emerald-800 dark:text-emerald-200">پیشنهاد CodeMage</span>}
+          </div>
+          <h3 className="text-lg font-black leading-8 tracking-tight text-foreground transition-colors group-hover:text-primary">{lesson.title}</h3>
+          <p className="mt-2 line-clamp-2 min-h-12 text-sm leading-6 text-muted-foreground">{lesson.summary || 'یک درس تازه برای ادامه‌ی مسیر یادگیری.'}</p>
+          <span className="mt-5 inline-flex items-center gap-2 text-sm font-extrabold text-primary">
+            خواندن درس <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-1" />
+          </span>
+        </div>
+      </article>
+    </Link>
+  );
+}
+
+function SubjectCard({ subject, index }: { subject: PublicSubject; index: number }) {
+  const art = artByColor[subject.color || 'violet'] || artByColor.violet;
+  const Icon = iconByName[subject.icon || ''] || (subject.kind === 'math' ? Sigma : subject.kind === 'physics' ? Atom : Braces);
+  const chapterCount = subject.chapters_count || 0;
+  const lessonCount = subject.lessons_count || 0;
+
+  return (
+    <Link href={`/tutorials/${subject.slug}`} className="group block h-full">
+      <article className="soft-card card-hover flex h-full flex-col overflow-hidden">
+        <div
+          className="subject-art relative flex h-44 items-center justify-center overflow-hidden"
+          style={{ '--art-start': art.start, '--art-end': art.end } as CSSProperties}
+        >
+          <div className="absolute -left-9 -top-12 size-44 rounded-full border border-white/55" />
+          <div className="absolute -left-1 top-4 size-28 rounded-full border border-white/60" />
+          <div className="absolute -bottom-12 right-6 size-36 rounded-full bg-white/25 blur-xl" />
+          <div className="relative flex size-[76px] items-center justify-center rounded-[1.7rem] border border-white/60 bg-white/65 text-[color:var(--subject-icon)] shadow-lg shadow-slate-700/10 backdrop-blur-md transition duration-300 group-hover:-rotate-6 group-hover:scale-105" style={{ '--subject-icon': art.icon } as CSSProperties}>
+            <Icon size={36} strokeWidth={1.65} />
+          </div>
+          <span className="absolute left-5 top-5 rounded-full border border-white/50 bg-white/60 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600 backdrop-blur">{String(index + 1).padStart(2, '0')} / SUBJECT</span>
+          <span className="absolute bottom-4 right-5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur">{subject.level || 'برای همه'}</span>
+        </div>
+        <div className="flex flex-1 flex-col p-6">
+          <h3 className="text-xl font-black tracking-tight text-foreground transition-colors group-hover:text-primary">{subject.title}</h3>
+          <p className="mt-2 line-clamp-2 min-h-12 text-sm leading-6 text-muted-foreground">{subject.description || 'مجموعه‌ای از درس‌های کوتاه و کاربردی برای یادگیری این موضوع.'}</p>
+          <div className="mt-5 flex items-center justify-between border-t border-border/70 pt-4 text-xs font-bold text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><BookOpen size={14} /> {formatNumber(lessonCount)} درس</span>
+            <span className="inline-flex items-center gap-1.5"><Layers3 size={14} /> {formatNumber(chapterCount)} فصل</span>
+            <span className="inline-flex items-center gap-1 text-primary transition-transform group-hover:-translate-x-1">ورود <ArrowLeft size={14} /></span>
+          </div>
+        </div>
+      </article>
+    </Link>
+  );
+}
+
+export default async function HomePage() {
+  const [settings, subjects, lessons, stats] = await Promise.all([
+    getPublicSettings(),
+    getPublicSubjects(),
+    getLatestLessons(4),
+    getPublicStats(),
+  ]);
+
+  const primaryHref = safeHref(settings.hero.primary_href, '/tutorials');
+  const secondaryHref = safeHref(settings.hero.secondary_href, '/learning-paths');
+  const ctaHref = safeHref(settings.cta.href, '/tutorials');
+
+  return (
+    <div dir="rtl">
+      <section className="page-container pt-5 sm:pt-8">
+        <div className="hero-panel px-6 py-10 sm:px-10 sm:py-14 lg:px-14 lg:py-[4.5rem]">
+          <div className="relative z-10 grid items-center gap-12 lg:grid-cols-[1fr_0.88fr] lg:gap-16">
+            <div className="max-w-2xl">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-2 text-xs font-bold text-white/80 backdrop-blur">
+                <Sparkles size={14} className="text-[#b7f486]" />
+                <span>یادگیریِ عمیق، ساده و فارسی</span>
+                <span className="size-1 rounded-full bg-[#b7f486]" />
+                <span className="text-white/50">CodeMage</span>
+              </div>
+              <h1 className="max-w-2xl text-[2.6rem] font-black leading-[1.35] tracking-tight text-white sm:text-5xl lg:text-[3.55rem]">
+                {settings.hero.title}{' '}
+                <span className="hero-highlight">{settings.hero.highlight}</span>
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-                Comprehensive tutorials and notes on JavaScript, React, Next.js, and more. From beginner to advanced, learn at your own pace.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity">
-                  Start Learning <ArrowRight size={18} />
-                </button>
-                <button className="inline-flex items-center justify-center gap-2 border border-border text-foreground px-8 py-3 rounded-lg font-semibold hover:bg-card transition-colors">
-                  Browse Courses
-                </button>
+              <p className="mt-6 max-w-xl text-base leading-8 text-white/65 sm:text-lg sm:leading-9">{settings.hero.subtitle}</p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link href={primaryHref} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl bg-[#b7f486] px-6 py-3.5 text-sm font-black text-[#17233a] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-[#c7f89c]">
+                  {settings.hero.primary_cta}<ArrowLeft size={17} />
+                </Link>
+                <Link href={secondaryHref} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-3.5 text-sm font-bold text-white transition hover:border-white/30 hover:bg-white/10">
+                  <Compass size={17} />{settings.hero.secondary_cta}
+                </Link>
+              </div>
+              <div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs font-semibold text-white/60">
+                <span className="inline-flex items-center gap-2"><span className="flex size-5 items-center justify-center rounded-full bg-[#b7f486]/15 text-[#b7f486]"><Check size={12} /></span>رایگان و همیشه در دسترس</span>
+                <span className="inline-flex items-center gap-2"><span className="flex size-5 items-center justify-center rounded-full bg-[#b7f486]/15 text-[#b7f486]"><Check size={12} /></span>محتوای فارسی و کاربردی</span>
               </div>
             </div>
-            <div className="hidden lg:block">
-              <div className="bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl p-12 border border-border h-80 flex items-center justify-center">
-                <div className="text-center">
-                  <Code2 size={64} className="text-primary mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground text-lg">Complete Web Development Learning Hub</p>
+
+            <div className="relative mx-auto w-full max-w-[490px] px-2 py-4 sm:px-5">
+              <div className="absolute -right-2 top-2 size-24 rounded-full bg-violet-400/35 blur-3xl" />
+              <div className="absolute -bottom-2 left-0 size-28 rounded-full bg-emerald-300/25 blur-3xl" />
+              <div className="hero-window relative z-10">
+                <div className="hero-window-top" dir="ltr">
+                  <span className="flex items-center gap-2"><Terminal size={13} /> learning-path.ts</span>
+                  <span className="flex gap-1.5"><i className="size-2 rounded-full bg-rose-400" /><i className="size-2 rounded-full bg-amber-300" /><i className="size-2 rounded-full bg-emerald-400" /></span>
+                </div>
+                <div className="hero-code" dir="ltr">
+                  <div><span className="code-muted">01</span> <span className="code-violet">const</span> <span className="code-mint">yourJourney</span> = {'{'}</div>
+                  <div><span className="code-muted">02</span> &nbsp; curious: <span className="code-yellow">true</span>,</div>
+                  <div><span className="code-muted">03</span> &nbsp; learn: <span className="code-mint">&quot;one step at a time&quot;</span>,</div>
+                  <div><span className="code-muted">04</span> &nbsp; practice: <span className="code-yellow">() =&gt; grow()</span></div>
+                  <div><span className="code-muted">05</span> {'}'}</div>
+                  <div className="mt-2 border-t border-white/10 pt-3 text-[#b7f486]"><span className="code-muted">06</span> <span className="code-violet">await</span> yourJourney.start(); <span className="animate-pulse">▍</span></div>
                 </div>
               </div>
+              <div className="float-card absolute -bottom-3 -right-1 z-20 flex items-center gap-3 rounded-2xl px-4 py-3 sm:-right-3">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-[#b7f486]/15 text-[#b7f486]"><BookOpen size={17} /></span>
+                <span><span className="block text-xs font-black text-white">قدم‌به‌قدم تا مهارت</span><span className="mt-1 block text-[10px] text-white/55">هر درس، یک پیشرفت واقعی</span></span>
+              </div>
+              <div className="float-card absolute -left-1 top-0 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-3 sm:-left-4">
+                <span className="flex size-8 items-center justify-center rounded-xl bg-violet-400/15 text-violet-200"><Play size={15} fill="currentColor" /></span>
+                <span className="text-xs font-bold text-white">شروع از همین‌جا</span>
+              </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 bg-card border border-border rounded-xl p-8 mb-12">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-1">150+</div>
-              <p className="text-muted-foreground">Tutorials & Notes</p>
-            </div>
-            <div className="text-center border-l border-r border-border">
-              <div className="text-3xl font-bold text-primary mb-1">50k+</div>
-              <p className="text-muted-foreground">Students Learning</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-1">{dbSubjects.length || 6}</div>
-              <p className="text-muted-foreground">Topics Covered</p>
-            </div>
+      <section className="page-container -mt-1 pt-5">
+        <div className="grid gap-3 rounded-[1.75rem] border border-border/75 bg-card p-4 shadow-[0_20px_50px_-40px_rgba(31,41,75,0.3)] sm:grid-cols-3 sm:p-5">
+          <div className="flex items-center gap-4 rounded-2xl px-4 py-3">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><BookOpen size={22} /></span>
+            <span><span className="block text-2xl font-black tracking-tight text-foreground">{formatNumber(stats.lessons_count)}</span><span className="mt-0.5 block text-xs font-semibold text-muted-foreground">درس منتشرشده</span></span>
           </div>
+          <div className="flex items-center gap-4 rounded-2xl border-y border-border/70 px-4 py-3 sm:border-y-0 sm:border-x">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-600 dark:text-emerald-300"><Layers3 size={22} /></span>
+            <span><span className="block text-2xl font-black tracking-tight text-foreground">{formatNumber(stats.subjects_count)}</span><span className="mt-0.5 block text-xs font-semibold text-muted-foreground">موضوع برای یادگیری</span></span>
+          </div>
+          <div className="flex items-center gap-4 rounded-2xl px-4 py-3">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-600 dark:text-amber-300"><Clock3 size={22} /></span>
+            <span><span className="block text-2xl font-black tracking-tight text-foreground">{formatNumber(stats.total_minutes)} <small className="text-sm font-bold">دقیقه</small></span><span className="mt-0.5 block text-xs font-semibold text-muted-foreground">محتوای آموزشی برای مطالعه</span></span>
+          </div>
+        </div>
+      </section>
 
-          {hasSupabaseError && (
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-8 text-sm text-yellow-700 dark:text-yellow-300">
-              <strong>هشدار:</strong> اتصال به Supabase برقرار نشد یا داده‌ای برنگشت. <br />
-              بررسی کن: <code className="bg-black/10 px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code> و{' '}
-              <code className="bg-black/10 px-1 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> در <code>.env.local</code> ست شده باشد،
-              و RLS و seed.sql اجرا شده باشد. خطا: {latestError?.message || 'no data'}
+      <section className="section-space">
+        <div className="page-container">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div>
+              <span className="section-kicker"><Sparkles size={14} /> موضوع‌های منتخب</span>
+              <h2 className="section-title">از کجا شروع کنیم؟</h2>
+              <p className="section-copy">موضوعی را انتخاب کن که همین حالا به آن علاقه داری؛ مسیرت را از همان‌جا می‌سازیم.</p>
             </div>
+            <Link href="/tutorials" className="inline-flex items-center gap-2 self-start rounded-xl px-2 py-3 text-sm font-extrabold text-primary transition hover:gap-3 sm:self-auto">همه‌ی موضوع‌ها <ArrowLeft size={16} /></Link>
+          </div>
+          {subjects.length > 0 ? (
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {subjects.slice(0, 6).map((subject, index) => <SubjectCard key={subject.id} subject={subject} index={index} />)}
+            </div>
+          ) : (
+            <div className="soft-card mt-8 p-8 text-center text-sm text-muted-foreground">هنوز موضوعی منتشر نشده است.</div>
           )}
         </div>
       </section>
 
-      {/* Search Section */}
-      <section className="px-4 sm:px-6 lg:px-8 mb-12">
-        <div className="mx-auto max-w-6xl">
-          <div className="relative">
-            <Search size={20} className="absolute left-4 top-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search tutorials, topics, or keywords..."
-              className="w-full pl-12 pr-6 py-3 rounded-lg border border-border bg-card text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
+      <section className="pb-16 sm:pb-20">
+        <div className="page-container">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div>
+              <span className="section-kicker"><Clock3 size={14} /> تازه‌های یادگیری</span>
+              <h2 className="section-title">درس بعدی‌ات منتظر توست</h2>
+              <p className="section-copy">درس‌های تازه و منتخب را ببین و بدون معطلی ادامه بده.</p>
+            </div>
+            <Link href="/tutorials" className="inline-flex items-center gap-2 self-start rounded-xl px-2 py-3 text-sm font-extrabold text-primary transition hover:gap-3 sm:self-auto">رفتن به کتابخانه <ArrowLeft size={16} /></Link>
           </div>
+          {lessons.length > 0 ? (
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {lessons.map((lesson, index) => <LessonCard key={lesson.id} lesson={lesson} index={index} />)}
+            </div>
+          ) : (
+            <div className="soft-card mt-8 p-8 text-center text-sm text-muted-foreground">به‌زودی درس‌های تازه به این بخش اضافه می‌شوند.</div>
+          )}
         </div>
       </section>
 
-      {/* Categories Section */}
-      <section className="px-4 sm:px-6 lg:px-8 mb-20">
-        <div className="mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-foreground mb-12">Learning Categories</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {categories.map((cat, idx) => {
-              const Icon = cat.icon;
-              return (
-                <Link href={`/tutorials/${cat.slug}`} key={idx}>
-                  <div
-                    className={`h-full bg-gradient-to-br ${cat.color} border border-border rounded-xl p-8 hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer group`}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                        <Icon className="text-primary" size={24} />
-                      </div>
-                    </div>
-                    <h3 className="text-2xl font-bold text-foreground mb-2">{cat.title}</h3>
-                    <p className="text-muted-foreground mb-4 line-clamp-2">{cat.description}</p>
-                    <span className="inline-flex items-center gap-2 text-primary font-semibold group-hover:translate-x-1 transition-transform mt-auto">
-                      Explore <ArrowRight size={16} />
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Tutorials (Dynamic from DB) */}
-      {featuredTutorials.length > 0 ? (
-        <section className="px-4 sm:px-6 lg:px-8 mb-20">
-          <div className="mx-auto max-w-6xl">
-            <div className="flex items-center justify-between mb-12">
-              <h2 className="text-3xl font-bold text-foreground">Featured Tutorials</h2>
-              <Link href="/learning-paths" className="text-primary font-semibold flex items-center gap-2 hover:translate-x-1 transition-transform">
-                View All <ArrowRight size={18} />
+      <section className="pb-20 sm:pb-24">
+        <div className="page-container">
+          <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-l from-primary to-[#5545c6] px-6 py-9 text-white shadow-xl shadow-primary/20 sm:px-10 sm:py-11">
+            <div className="absolute -left-14 -top-24 size-64 rounded-full border border-white/15" />
+            <div className="absolute -left-2 -top-12 size-40 rounded-full border border-white/10" />
+            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold"><Rocket size={14} /> مسیر تو از همین حالا شروع می‌شود</span>
+                <h2 className="mt-4 text-2xl font-black leading-tight sm:text-3xl">{settings.cta.title}</h2>
+                <p className="mt-2 text-sm leading-7 text-white/75 sm:text-base">{settings.cta.text}</p>
+              </div>
+              <Link href={ctaHref} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-black text-primary transition hover:-translate-y-0.5 hover:bg-[#f1f0ff]">
+                {settings.cta.button}<ArrowUpLeft size={17} />
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredTutorials.map((tutorial) => (
-                <Link href={tutorial.href} key={tutorial.id}>
-                  <div className="h-full bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer group flex flex-col">
-                    <div className={`${tutorial.image} h-32 group-hover:opacity-80 transition-opacity`} />
-                    <div className="p-6 flex flex-col flex-grow">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded">
-                          {tutorial.category}
-                        </span>
-                        <span className="text-xs font-semibold text-muted-foreground truncate">{tutorial.level}</span>
-                      </div>
-                      <h3 className="font-bold text-foreground mb-3 line-clamp-2 group-hover:text-primary transition-colors">
-                        {tutorial.title}
-                      </h3>
-                      <div className="space-y-2 mb-4 text-sm text-muted-foreground mt-auto">
-                        <div className="flex items-center gap-2">
-                          <Star size={14} className="fill-yellow-400 text-yellow-400" />
-                          <span>{tutorial.rating}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock size={14} />
-                          <span>{tutorial.duration}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users size={14} />
-                          <span>{tutorial.students.toLocaleString()} students</span>
-                        </div>
-                      </div>
-                      <span className="w-full text-center py-2 bg-primary/10 text-primary rounded font-semibold hover:bg-primary hover:text-primary-foreground transition-colors block">
-                        Start Tutorial
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
           </div>
-        </section>
-      ) : (
-        <section className="px-4 sm:px-6 lg:px-8 mb-20">
-          <div className="mx-auto max-w-6xl">
-            <div className="bg-card border border-dashed border-border rounded-xl p-12 text-center">
-              <BookOpen className="mx-auto mb-4 text-muted-foreground" size={32} />
-              <h3 className="font-bold text-foreground mb-2">هنوز درسی منتشر نشده</h3>
-              <p className="text-muted-foreground text-sm">
-                اگر Supabase را تازه ساختی، فایل <code>supabase/schema.sql</code> و بعد <code>supabase/seed.sql</code> را در SQL Editor اجرا کن.
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Learning Paths */}
-      <section className="px-4 sm:px-6 lg:px-8 mb-20">
-        <div className="mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-foreground mb-12">Recommended Learning Paths</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {learningPaths.map((path, idx) => (
-              <div key={idx} className="bg-card border border-border rounded-xl p-8 hover:shadow-lg hover:border-primary/50 transition-all">
-                <h3 className="text-xl font-bold text-foreground mb-4">{path.title}</h3>
-                <div className="space-y-3 mb-6">
-                  {path.steps.map((step, stepIdx) => (
-                    <div key={stepIdx} className="flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-bold text-primary">{stepIdx + 1}</span>
-                      </div>
-                      <span className="text-foreground">{step}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="pt-6 border-t border-border flex items-center justify-between">
-                  <span className="text-sm font-semibold text-muted-foreground">{path.duration}</span>
-                  <button className="text-primary font-semibold flex items-center gap-2 hover:translate-x-1 transition-transform">
-                    Start <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="mt-5 flex flex-col items-center justify-between gap-3 text-xs text-muted-foreground sm:flex-row">
+            <span className="inline-flex items-center gap-2"><Check size={14} className="text-emerald-500" /> محتوا قابل ویرایش و همیشه به‌روز</span>
+            <Link href="/learning-paths" className="inline-flex items-center gap-1 font-bold text-primary">آشنایی با مسیرهای یادگیری <ArrowLeft size={14} /></Link>
           </div>
         </div>
       </section>
-
-      {/* CTA Section */}
-      <section className="px-4 sm:px-6 lg:px-8 mb-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-2xl p-12 text-center">
-            <h2 className="text-3xl font-bold text-foreground mb-4">Ready to Start Learning?</h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Join thousands of students learning web development. Get instant access to all tutorials, notes, and resources.
-            </p>
-            <button className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-10 py-4 rounded-lg font-semibold hover:opacity-90 transition-opacity text-lg">
-              Create Free Account <ArrowRight size={20} />
-            </button>
-          </div>
-        </div>
-      </section>
-    </main>
+    </div>
   );
 }

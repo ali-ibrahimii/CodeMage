@@ -1,112 +1,110 @@
 'use client';
 
-import { Button } from "../ui/button";
-import Nav from "./Nav";
-import Link from "next/link";
-import { Code2, Search, Menu, X, Moon, Sun } from "lucide-react";
-import { useState } from "react";
-import { useTheme } from "../providers/ThemeProvider";
+import { useState } from 'react';
+import Link from 'next/link';
+import { BookOpen, Code2, Menu, Moon, Search, Sun, X, ArrowUpLeft } from 'lucide-react';
+import Nav from './Nav';
+import { useTheme } from '../providers/ThemeProvider';
 
-export default function Header() {
-    const [isOpen, setIsOpen] = useState(false);
-    const { theme, toggleTheme } = useTheme();
+export type HeaderBrand = {
+  name: string;
+  tagline: string;
+};
 
-    return (
-        <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-            <div className="px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                    {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                        <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-                            <Code2 size={20} className="text-primary-foreground" />
-                        </div>
-                        <span className="font-bold text-lg text-foreground hidden sm:inline">DevTutorials</span>
-                    </Link>
+export default function Header({ brand }: { brand: HeaderBrand }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
-                    {/* Desktop Navigation */}
-                    <div className="hidden md:flex items-center gap-8">
-                        <Nav />
-                    </div>
+  return (
+    <header className="site-header">
+      <div className="page-container">
+        <div className="flex h-[76px] items-center justify-between gap-4">
+          <Link href="/" className="group flex min-w-0 items-center gap-3" aria-label={`${brand.name}، صفحه‌ی اصلی`}>
+            <span className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#725bff] via-[#735fe7] to-[#36c6ab] text-white shadow-lg shadow-primary/25 transition-transform group-hover:-rotate-3 group-hover:scale-105">
+              <Code2 size={23} strokeWidth={2.2} />
+              <span className="absolute -bottom-2 -left-1 size-5 rounded-full bg-[#b7f486]/80 blur-md" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-base font-black tracking-tight text-foreground sm:text-lg">{brand.name}</span>
+              <span className="hidden truncate text-[10px] font-medium text-muted-foreground sm:block">{brand.tagline}</span>
+            </span>
+          </Link>
 
-                    {/* Search Bar - Desktop */}
-                    <div className="hidden lg:flex items-center flex-1 max-w-xs mx-8">
-                        <div className="relative w-full">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                            <input
-                                type="text"
-                                placeholder="Search tutorials..."
-                                className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-card text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                            />
-                        </div>
-                    </div>
+          <div className="hidden items-center gap-2 lg:flex">
+            <Nav />
+          </div>
 
-                    {/* Right Side - Auth Buttons */}
-                    <div className="flex items-center gap-3">
-                        {/* Theme Toggle */}
-                        <button
-                            onClick={toggleTheme}
-                            className="p-2 hover:bg-card rounded-lg transition-colors"
-                            aria-label="Toggle theme"
-                        >
-                            {theme === 'light' ? (
-                                <Moon size={20} className="text-foreground hover:text-primary" />
-                            ) : (
-                                <Sun size={20} className="text-foreground hover:text-primary" />
-                            )}
-                        </button>
+          <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 md:flex lg:flex-none">
+            <form action="/tutorials" method="get" className="relative hidden w-[200px] xl:block">
+              <Search size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                name="q"
+                aria-label="جستجو در درس‌ها"
+                placeholder="جست‌وجوی درس‌ها..."
+                className="w-full rounded-2xl border border-border/80 bg-card/75 py-2.5 pe-9 ps-3 text-xs outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/45 focus:ring-4 focus:ring-primary/10"
+              />
+            </form>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex size-10 items-center justify-center rounded-2xl border border-border/80 bg-card/70 text-muted-foreground transition hover:border-primary/30 hover:text-primary"
+              aria-label={theme === 'light' ? 'فعال‌کردن حالت تاریک' : 'فعال‌کردن حالت روشن'}
+              title={theme === 'light' ? 'حالت تاریک' : 'حالت روشن'}
+            >
+              {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
+            </button>
+            <Link href="/dashboard" className="inline-flex h-10 items-center gap-2 rounded-2xl bg-[#17233a] px-4 text-xs font-bold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-primary">
+              <BookOpen size={15} />
+              پنل مدیریت
+              <ArrowUpLeft size={14} className="opacity-70" />
+            </Link>
+          </div>
 
-                        <button className="hidden sm:inline text-foreground hover:text-primary font-medium transition-colors">
-                            Sign In
-                        </button>
-                        <Button className="hidden sm:inline bg-primary hover:bg-primary/90 text-primary-foreground">
-                            Get Started Free
-                        </Button>
+          <div className="flex items-center gap-2 md:hidden">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex size-10 items-center justify-center rounded-2xl border border-border/80 bg-card/70 text-muted-foreground"
+              aria-label={theme === 'light' ? 'فعال‌کردن حالت تاریک' : 'فعال‌کردن حالت روشن'}
+            >
+              {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsOpen((open) => !open)}
+              className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground"
+              aria-label={isOpen ? 'بستن منو' : 'بازکردن منو'}
+              aria-expanded={isOpen}
+            >
+              {isOpen ? <X size={19} /> : <Menu size={19} />}
+            </button>
+          </div>
+        </div>
 
-                        {/* Mobile Menu Button */}
-                        <button
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="md:hidden p-2 hover:bg-card rounded-lg transition-colors"
-                        >
-                            {isOpen ? (
-                                <X size={24} className="text-foreground" />
-                            ) : (
-                                <Menu size={24} className="text-foreground" />
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Mobile Navigation */}
-                {isOpen && (
-                    <div className="md:hidden pb-6 border-t border-border animate-in fade-in slide-in-from-top-2">
-                        <Nav isMobile />
-                        <div className="mt-4 pt-4 border-t border-border flex flex-col gap-3">
-                            <button
-                                onClick={toggleTheme}
-                                className="flex items-center gap-2 py-2 px-3 text-foreground hover:text-primary hover:bg-card rounded-lg transition-all font-medium w-full"
-                            >
-                                {theme === 'light' ? (
-                                    <>
-                                        <Moon size={18} />
-                                        Dark Mode
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sun size={18} />
-                                        Light Mode
-                                    </>
-                                )}
-                            </button>
-                            <button className="text-foreground hover:text-primary font-medium transition-colors text-left py-2">
-                                Sign In
-                            </button>
-                            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                                Get Started Free
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </header>
-    );
+        {isOpen && (
+          <div className="border-t border-border/70 py-4 lg:hidden">
+            <form action="/tutorials" method="get" className="relative mb-3">
+              <Search size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                name="q"
+                aria-label="جستجو در درس‌ها"
+                placeholder="جست‌وجوی موضوع یا درس..."
+                className="w-full rounded-2xl border border-border bg-card py-3 pe-9 ps-4 text-sm outline-none focus:border-primary/45 focus:ring-4 focus:ring-primary/10"
+              />
+            </form>
+            <Nav isMobile onNavigate={() => setIsOpen(false)} />
+            <Link
+              href="/dashboard"
+              onClick={() => setIsOpen(false)}
+              className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-[#17233a] px-4 py-3.5 text-sm font-bold text-white"
+            >
+              <BookOpen size={16} /> ورود به پنل مدیریت
+            </Link>
+          </div>
+        )}
+      </div>
+    </header>
+  );
 }

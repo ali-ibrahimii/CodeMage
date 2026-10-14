@@ -1,208 +1,138 @@
-// app/tutorials/[name]/page.tsx
-import { CheckCircle, Clock, BookOpen } from 'lucide-react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { notFound } from 'next/navigation';
+import {
+  ArrowLeft,
+  Atom,
+  BookOpen,
+  Braces,
+  CheckCircle2,
+  Clock3,
+  Code2,
+  GraduationCap,
+  Layers3,
+  Play,
+  Sigma,
+  Sparkles,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { getPublicSubject } from '@/lib/content';
 
-export default async function TutorialListPage({ params }: { params: { name: string } }) {
+export const dynamic = 'force-dynamic';
+
+const iconByName: Record<string, LucideIcon> = { Braces, Code2, Atom, Sigma, BookOpen, GraduationCap };
+
+function number(value: number) {
+  return new Intl.NumberFormat('fa-IR').format(value);
+}
+
+export default async function TutorialListPage({ params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
-  const topicName = name.toLowerCase();
+  const data = await getPublicSubject(name.toLowerCase());
+  if (!data) notFound();
 
-  // ۱) موضوع را از جدول subjects بگیر (اسکیمای جدید)
-  const { data: subject, error: subjectError } = await supabase
-    .from('subjects')
-    .select('*')
-    .eq('slug', topicName)
-    .eq('is_published', true)
-    .single();
-
-  // اگر موضوع پیدا نشد، تلاش کن اسکیمای قدیمی را هم چک کنی (tech_slug)
-  let lessons: any[] = [];
-  let chapters: any[] = [];
-  let meta: any = null;
-
-  if (subject) {
-    meta = {
-      title: subject.title,
-      description: subject.description,
-      color: subject.color || 'blue',
-      kind: subject.kind,
-    };
-
-    // سرفصل‌ها
-    const { data: chaptersData } = await supabase
-      .from('chapters')
-      .select('*')
-      .eq('subject_id', subject.id)
-      .eq('is_published', true)
-      .order('order_index', { ascending: true });
-
-    chapters = chaptersData || [];
-
-    // درس‌ها
-    const { data: lessonsData } = await supabase
-      .from('lessons')
-      .select('*')
-      .eq('subject_id', subject.id)
-      .eq('status', 'published')
-      .order('order_index', { ascending: true })
-      .order('created_at', { ascending: true });
-
-    lessons = lessonsData || [];
-  } else {
-    // fallback قدیمی: اگر subjects نبود، از lessons با tech_slug استفاده کن
-    const { data: legacyLessons } = await supabase
-      .from('lessons')
-      .select('*')
-      .eq('tech_slug', topicName)
-      .order('id', { ascending: true });
-
-    if (legacyLessons && legacyLessons.length > 0) {
-      lessons = legacyLessons.map((l: any) => ({
-        id: l.id,
-        slug: l.lesson_slug,
-        title: l.title,
-        summary: l.module,
-        duration_minutes: parseInt(l.duration) || 20,
-        chapter_id: null,
-      }));
-      meta = {
-        title: topicName.charAt(0).toUpperCase() + topicName.slice(1),
-        description: 'دوره آموزشی',
-        color: 'yellow',
-      };
-    }
-  }
-
-  if (!meta || (!lessons.length && !subjectError)) {
-    // اگر واقعاً چیزی نیست، صفحه not found دوستانه
-    return (
-      <main className="min-h-screen bg-gradient-to-b from-background via-background to-card/30 px-4 py-20" dir="ltr">
-        <div className="max-w-6xl mx-auto text-center">
-          <BookOpen className="mx-auto mb-4 text-muted-foreground" size={48} />
-          <h1 className="text-4xl font-bold text-foreground mb-4">Tutorial Not Found</h1>
-          <p className="text-muted-foreground mb-2">موضوع "{topicName}" پیدا نشد یا هنوز درسی برایش منتشر نشده.</p>
-          {subjectError && (
-            <p className="text-xs text-muted-foreground mb-8">Supabase error: {subjectError.message}</p>
-          )}
-          <div className="bg-card border border-border rounded-lg p-6 text-left max-w-xl mx-auto mb-8">
-            <h3 className="font-bold mb-2">برای رفع مشکل:</h3>
-            <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
-              <li>مطمئن شو <code>supabase/schema.sql</code> را اجرا کرده‌ای</li>
-              <li>بعد <code>supabase/seed.sql</code> را اجرا کن تا داده نمونه (c, math, physics) بیاید</li>
-              <li>یا اگر داده قدیمی (javascript, react...) داری، از اسکریپت seed جدید استفاده کن</li>
-              <li>چک کن RLS برای anon اجازه خواندن lessons و subjects را می‌دهد</li>
-            </ol>
-          </div>
-          <Link href="/" className="text-primary hover:text-primary/80">← Back to Home</Link>
-        </div>
-      </main>
-    );
-  }
-
-  // گروه‌بندی درس‌ها بر اساس chapter
-  const grouped: Record<string, { chapter: any; lessons: any[] }> = {};
-
-  if (chapters.length > 0) {
-    chapters.forEach((ch) => {
-      grouped[ch.id] = { chapter: ch, lessons: [] };
-    });
-    lessons.forEach((ls) => {
-      const chId = ls.chapter_id;
-      if (chId && grouped[chId]) {
-        grouped[chId].lessons.push(ls);
-      } else {
-        // اگر chapter_id نداشت، بریز در گروه اول یا گروه بدون سرفصل
-        const firstKey = Object.keys(grouped)[0];
-        if (firstKey) grouped[firstKey].lessons.push(ls);
-        else {
-          if (!grouped['no-chapter']) grouped['no-chapter'] = { chapter: { title: 'عمومی', slug: 'general' }, lessons: [] };
-          grouped['no-chapter'].lessons.push(ls);
-        }
-      }
-    });
-  } else {
-    // اگر سرفصلی نبود، همه را بر اساس module یا یک گروه بریز
-    const byModule: Record<string, any[]> = {};
-    lessons.forEach((l: any) => {
-      const mod = l.summary || l.module || 'General';
-      if (!byModule[mod]) byModule[mod] = [];
-      byModule[mod].push(l);
-    });
-    Object.entries(byModule).forEach(([mod, items]) => {
-      grouped[mod] = { chapter: { title: mod, slug: mod }, lessons: items };
-    });
-  }
-
-  const topics = Object.values(grouped)
-    .filter((g) => g.lessons.length > 0)
-    .map((g) => ({
-      level: g.chapter.title,
-      slug: g.chapter.slug,
-      description: g.chapter.description,
-      items: g.lessons.map((item: any) => ({
-        id: item.slug || item.lesson_slug,
-        title: item.title,
-        duration: item.duration_minutes ? `${item.duration_minutes} دقیقه` : item.duration || '20 دقیقه',
-      })),
-    }));
-
-  const colorClasses: Record<string, string> = {
-    yellow: 'from-yellow-500/20 to-yellow-600/20 border-yellow-500/20 text-yellow-500',
-    cyan: 'from-cyan-500/20 to-blue-600/20 border-cyan-500/20 text-cyan-500',
-    gray: 'from-gray-500/20 to-gray-700/20 border-gray-500/20 text-gray-500',
-    blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/20 text-blue-500',
-    violet: 'from-violet-500/20 to-purple-600/20 border-violet-500/20 text-violet-500',
-    emerald: 'from-emerald-500/20 to-green-600/20 border-emerald-500/20 text-emerald-500',
-    orange: 'from-orange-500/20 to-red-600/20 border-orange-500/20 text-orange-500',
+  const { subject, chapters, lessons } = data;
+  const SubjectIcon = iconByName[subject.icon || ''] || (subject.kind === 'physics' ? Atom : subject.kind === 'math' ? Sigma : Braces);
+  const totalMinutes = lessons.reduce((total, lesson) => total + (lesson.duration_minutes || 0), 0);
+  const firstLesson = lessons[0];
+  const lessonsForChapter = (chapterId: string) => lessons.filter((lesson) => lesson.chapter_id === chapterId);
+  const colors: Record<string, string> = {
+    blue: 'from-blue-500/25 to-cyan-400/10',
+    cyan: 'from-cyan-400/25 to-teal-300/10',
+    violet: 'from-violet-500/30 to-fuchsia-400/10',
+    emerald: 'from-emerald-400/25 to-teal-300/10',
+    yellow: 'from-amber-300/30 to-orange-300/10',
+    orange: 'from-orange-400/25 to-rose-300/10',
+    gray: 'from-slate-400/25 to-slate-200/10',
   };
-
-  const colors = colorClasses[meta.color] || colorClasses.blue;
+  const theme = colors[subject.color || 'violet'] || colors.violet;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-card/30" dir="ltr">
-      <section className="px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-12">
-            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground mb-6">
-              Master <span className={`${colors.split(' ')[3]}`}>{meta.title}</span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">{meta.description}</p>
-            <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-2"><BookOpen size={16} /> {lessons.length} درس</span>
-              <span className="flex items-center gap-2"><Clock size={16} /> {chapters.length} سرفصل</span>
+    <div className="page-container pb-20 pt-8 sm:pt-12" dir="rtl">
+      <section className={`relative overflow-hidden rounded-[2rem] border border-border/60 bg-gradient-to-br ${theme} px-6 py-8 sm:px-10 sm:py-11`}>
+        <div className="absolute -left-12 -top-16 size-60 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
+              <Link href="/tutorials" className="transition hover:text-primary">همه‌ی موضوع‌ها</Link>
+              <span>/</span><span className="text-primary">{subject.title}</span>
             </div>
+            <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/60 bg-card/60 px-3 py-1.5 text-[11px] font-black text-primary shadow-sm backdrop-blur"><Sparkles size={13} /> مسیر یادگیری CodeMage</span>
+            <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight text-foreground sm:text-5xl">{subject.title}</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-8 text-muted-foreground sm:text-base">{subject.description || `از پایه تا قدم‌های بعدی، ${subject.title} را با مثال‌های ساده یاد بگیر.`}</p>
+            <div className="mt-6 flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/75 px-3.5 py-2"><BookOpen size={14} className="text-primary" />{number(lessons.length)} درس منتشرشده</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/75 px-3.5 py-2"><Layers3 size={14} className="text-primary" />{number(chapters.length)} فصل</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/75 px-3.5 py-2"><Clock3 size={14} className="text-primary" />حدود {number(Math.ceil(totalMinutes / 60))} ساعت مطالعه</span>
+              {subject.level && <span className="rounded-full border border-border/70 bg-card/75 px-3.5 py-2">{subject.level}</span>}
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-4 sm:flex-row lg:flex-col">
+            <span className="flex size-28 items-center justify-center rounded-[2rem] border border-white/70 bg-card/70 text-primary shadow-xl shadow-primary/10 backdrop-blur"><SubjectIcon size={48} strokeWidth={1.5} /></span>
+            {firstLesson ? (
+              <Link href={`/tutorials/${subject.slug}/${firstLesson.slug}`} className="button-primary w-full sm:w-auto lg:w-full"><Play size={16} fill="currentColor" /> شروع اولین درس</Link>
+            ) : (
+              <span className="rounded-2xl border border-border bg-card/75 px-5 py-3 text-center text-xs font-bold text-muted-foreground">درس‌ها به‌زودی منتشر می‌شوند</span>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mx-auto max-w-6xl">
-          <div className="space-y-12">
-            {topics.map((section: any, idx: number) => (
-              <div key={idx}>
-                <h2 className="text-2xl font-bold text-foreground mb-2">{section.level}</h2>
-                {section.description && <p className="text-muted-foreground mb-6">{section.description}</p>}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {section.items.map((item: any) => (
-                    <Link key={item.id} href={`/tutorials/${topicName}/${item.id}`}>
-                      <div className="bg-card border border-border rounded-lg p-5 hover:shadow-md hover:border-primary/50 transition-all cursor-pointer group h-full">
-                        <div className="flex items-start justify-between mb-3">
-                          <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{item.title}</h3>
-                          <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Lesson</span>
-                          <span>{item.duration}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
+      <section className="mt-12">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+          <div>
+            <span className="section-kicker"><Layers3 size={14} /> فهرست درس‌ها</span>
+            <h2 className="section-title">مسیر این موضوع</h2>
+            <p className="section-copy">درس‌ها بر اساس فصل مرتب شده‌اند؛ هرجا خواستی می‌توانی ادامه بدهی.</p>
           </div>
+          <Link href="/learning-paths" className="inline-flex items-center gap-2 self-start rounded-xl px-2 py-3 text-sm font-extrabold text-primary transition hover:gap-3 sm:self-auto">مسیر یادگیری <ArrowLeft size={16} /></Link>
         </div>
+
+        {chapters.length > 0 ? (
+          <div className="mt-7 space-y-5">
+            {chapters.map((chapter, chapterIndex) => {
+              const chapterLessons = lessonsForChapter(chapter.id);
+              return (
+                <section key={chapter.id} className="soft-card overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-muted/35 px-5 py-4 sm:px-7">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-sm font-black text-primary">{number(chapterIndex + 1)}</span>
+                      <div>
+                        <h3 className="text-base font-black tracking-tight sm:text-lg">{chapter.title}</h3>
+                        {chapter.description && <p className="mt-1 text-xs leading-5 text-muted-foreground">{chapter.description}</p>}
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground">{number(chapterLessons.length)} درس</span>
+                  </div>
+
+                  <div className="divide-y divide-border/65 px-4 sm:px-6">
+                    {chapterLessons.length > 0 ? chapterLessons.map((lesson, lessonIndex) => (
+                      <Link key={lesson.id} href={`/tutorials/${subject.slug}/${lesson.slug}`} className="group flex items-center gap-3 py-4 sm:gap-4 sm:py-5">
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background text-muted-foreground transition group-hover:bg-primary group-hover:text-primary-foreground"><span className="text-xs font-black">{number(lessonIndex + 1)}</span></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-black text-foreground transition-colors group-hover:text-primary sm:text-base">{lesson.title}</span>
+                          {lesson.summary && <span className="mt-1 line-clamp-1 block text-xs leading-5 text-muted-foreground">{lesson.summary}</span>}
+                        </span>
+                        <span className="hidden shrink-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground sm:inline-flex"><Clock3 size={13} /> {number(lesson.duration_minutes || 20)} دقیقه</span>
+                        {lesson.is_featured && <span className="hidden rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 sm:inline-flex">ویژه</span>}
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl text-primary transition group-hover:bg-primary/10"><ArrowLeft size={17} /></span>
+                      </Link>
+                    )) : (
+                      <div className="flex items-center gap-3 py-5 text-sm text-muted-foreground"><CheckCircle2 size={17} className="text-primary/60" /> درس‌های این فصل در حال آماده‌سازی هستند.</div>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="soft-card mt-7 p-10 text-center">
+            <BookOpen className="mx-auto text-muted-foreground/60" size={32} />
+            <h3 className="mt-4 font-black">فصل‌ها به‌زودی اضافه می‌شوند</h3>
+            <p className="mt-2 text-sm text-muted-foreground">برای دیدن مسیرهای دیگر به کتابخانه برگرد.</p>
+            <Link href="/tutorials" className="button-primary mt-5">مشاهده‌ی موضوع‌ها <ArrowLeft size={15} /></Link>
+          </div>
+        )}
       </section>
-    </main>
+    </div>
   );
 }

@@ -1,14 +1,66 @@
-## Next.js Learning Road Map
+# CodeMage
 
-1- What is Next.js and why Next.js
-2- Installation and Run
-3- Project structure and App Router
-4- Routing(مسیر یابی)
-5- Server Components vs Client Components
-6- Data Fetching --> `app/posts/page.tsx`, `app/utils/get-user.ts`
-7- Layouts, Loading and Error --> `app/layout.tsx`
-8- API Routes
-9- Authentication
-10- Deployment
+یک فضای فارسی برای یادگیری برنامه‌نویسی، ریاضی و علوم؛ با فهرست موضوع‌ها، مسیرهای آموزشی و پنل مدیریت محتوا.
 
-## React Road Map
+## شروع سریع
+
+```bash
+corepack pnpm install
+corepack pnpm dev
+```
+
+سایت به‌صورت پیش‌فرض با محتوای نمایشی بالا می‌آید. برای ذخیره و انتشار واقعی درس‌ها، یک پروژه‌ی Supabase متصل کن.
+
+## راه‌اندازی Supabase
+
+۱. در ریشه‌ی پروژه فایلی به نام `.env.local` بساز و مقادیر پروژه را قرار بده:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
+```
+
+کلید عمومی `publishable` یا `anon` را استفاده کن؛ **هرگز** `service_role` را در متغیر `NEXT_PUBLIC_*` قرار نده.
+
+۲. در Supabase → SQL Editor فایل‌ها را به‌ترتیب اجرا کن:
+
+- `supabase/schema.sql`
+- `supabase/seed.sql` (اختیاری؛ محتوای نمونه‌ی زبان C، ریاضی و فیزیک را اضافه می‌کند)
+
+۳. در Supabase → Authentication → Users یک کاربر بساز و حساب را تأیید کن. سپس در SQL Editor نقش همان حساب را مدیر کن:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'your@email.com';
+```
+
+برای بررسی دسترسی:
+
+```sql
+select public.is_admin();
+```
+
+۴. سرور توسعه را دوباره اجرا کن و به مسیر `/dashboard` برو. با همان ایمیل و گذرواژه وارد می‌شوی.
+
+## پنل مدیریت
+
+از `/dashboard` می‌توانی:
+
+- درس جدید بسازی، پیش‌نویس نگه داری یا منتشر کنی؛
+- عنوان، نامک، توضیح، زمان مطالعه و محتوای Markdown را ویرایش کنی؛
+- درس‌ها را به موضوع و فصل متصل کنی یا هنگام ساخت درس، فصل تازه بسازی؛
+- درس را به‌عنوان محتوای ویژه‌ی صفحه‌ی اصلی علامت‌گذاری کنی؛
+- نام و شعار سایت، متن هیرو، دکمه‌ها، بخش دعوت به یادگیری و خبرنامه را ویرایش کنی.
+
+محتوای درس Markdown است: برای تیتر از `## عنوان بخش`، برای متن پررنگ از `**نکته‌ی مهم**` و برای فهرست از `- مورد اول` استفاده کن. مثال کد را داخل سه بک‌تیک قرار بده و زبانش را پس از بک‌تیک‌ها بنویس؛ مثلاً `js`.
+
+دسترسی نوشتن با Supabase Auth و سیاست‌های RLS در `supabase/schema.sql` محافظت می‌شود؛ اپلیکیشن از کلید محرمانه‌ی مدیر استفاده نمی‌کند.
+
+## فرمان‌های توسعه
+
+```bash
+corepack pnpm dev
+corepack pnpm lint
+corepack pnpm build
+```

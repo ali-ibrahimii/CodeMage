@@ -1,495 +1,149 @@
-import { CheckCircle2, Clock, Users, Target, Zap, BookOpen, Code2, Rocket, Database, ArrowRight, Lock } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, BookOpen, Check, Clock3, Compass, Layers3, Sparkles, Target } from 'lucide-react';
+import { getPublicSubject, getPublicSubjects } from '@/lib/content';
 
-export default function LearningPathsPage() {
-    const learningPaths = [
-        {
-            id: 1,
-            title: 'Frontend Developer',
-            description: 'Master modern frontend development with HTML, CSS, JavaScript, React, and Next.js',
-            duration: '24 weeks',
-            level: 'Beginner to Advanced',
-            students: 12500,
-            difficulty: 'Intermediate',
-            icon: Code2,
-            color: 'from-blue-500/20 to-cyan-600/20',
-            borderColor: 'border-blue-500/20',
-            accentColor: 'text-blue-500',
-            steps: [
-                {
-                    week: '1-2',
-                    title: 'Web Fundamentals',
-                    topics: ['Internet Basics', 'HTML5 Structure', 'CSS Fundamentals'],
-                    duration: '12 hours',
-                    tutorials: 15
-                },
-                {
-                    week: '3-4',
-                    title: 'CSS Mastery',
-                    topics: ['Flexbox', 'Grid', 'Responsive Design', 'Animations'],
-                    duration: '16 hours',
-                    tutorials: 20
-                },
-                {
-                    week: '5-8',
-                    title: 'JavaScript Essentials',
-                    topics: ['Variables & Types', 'Functions', 'DOM', 'Events', 'Async JS'],
-                    duration: '32 hours',
-                    tutorials: 40
-                },
-                {
-                    week: '9-16',
-                    title: 'React.js Mastery',
-                    topics: ['Components', 'Hooks', 'State Management', 'Routing'],
-                    duration: '40 hours',
-                    tutorials: 50
-                },
-                {
-                    week: '17-24',
-                    title: 'Next.js & Deployment',
-                    topics: ['Next.js Framework', 'API Routes', 'Deployment', 'Projects'],
-                    duration: '32 hours',
-                    tutorials: 40
-                }
-            ]
-        },
-        {
-            id: 2,
-            title: 'Full-Stack Developer',
-            description: 'Complete path to become a full-stack developer. Build end-to-end applications.',
-            duration: '32 weeks',
-            level: 'Beginner to Advanced',
-            students: 8900,
-            difficulty: 'Advanced',
-            icon: Rocket,
-            color: 'from-purple-500/20 to-pink-600/20',
-            borderColor: 'border-purple-500/20',
-            accentColor: 'text-purple-500',
-            steps: [
-                {
-                    week: '1-8',
-                    title: 'Frontend Foundation',
-                    topics: ['HTML', 'CSS', 'JavaScript', 'React Basics'],
-                    duration: '32 hours',
-                    tutorials: 40
-                },
-                {
-                    week: '9-12',
-                    title: 'Backend Basics',
-                    topics: ['Node.js', 'Express.js', 'REST APIs'],
-                    duration: '24 hours',
-                    tutorials: 30
-                },
-                {
-                    week: '13-18',
-                    title: 'Database & Backend',
-                    topics: ['MongoDB', 'PostgreSQL', 'Database Design', 'Authentication'],
-                    duration: '30 hours',
-                    tutorials: 35
-                },
-                {
-                    week: '19-26',
-                    title: 'Advanced Frontend & Backend',
-                    topics: ['Advanced React', 'Next.js', 'Advanced Node.js', 'Microservices'],
-                    duration: '40 hours',
-                    tutorials: 45
-                },
-                {
-                    week: '27-32',
-                    title: 'Deployment & Projects',
-                    topics: ['DevOps Basics', 'Docker', 'CI/CD', 'Full-Stack Projects'],
-                    duration: '28 hours',
-                    tutorials: 32
-                }
-            ]
-        },
-        {
-            id: 3,
-            title: 'React Specialist',
-            description: 'Deep dive into React.js. Master components, state management, and performance.',
-            duration: '16 weeks',
-            level: 'Intermediate to Advanced',
-            students: 6200,
-            difficulty: 'Advanced',
-            icon: Zap,
-            color: 'from-cyan-500/20 to-blue-600/20',
-            borderColor: 'border-cyan-500/20',
-            accentColor: 'text-cyan-500',
-            steps: [
-                {
-                    week: '1-2',
-                    title: 'React Fundamentals',
-                    topics: ['JSX', 'Components', 'Props', 'State'],
-                    duration: '12 hours',
-                    tutorials: 15
-                },
-                {
-                    week: '3-6',
-                    title: 'React Hooks',
-                    topics: ['useState', 'useEffect', 'Custom Hooks', 'useContext'],
-                    duration: '20 hours',
-                    tutorials: 25
-                },
-                {
-                    week: '7-10',
-                    title: 'State Management',
-                    topics: ['Redux', 'Zustand', 'Context API', 'Data Flow'],
-                    duration: '24 hours',
-                    tutorials: 30
-                },
-                {
-                    week: '11-14',
-                    title: 'Advanced React',
-                    topics: ['Performance', 'Code Splitting', 'Error Boundaries', 'Testing'],
-                    duration: '20 hours',
-                    tutorials: 25
-                },
-                {
-                    week: '15-16',
-                    title: 'Real-World Projects',
-                    topics: ['Complex Apps', 'Best Practices', 'Portfolio Projects'],
-                    duration: '12 hours',
-                    tutorials: 15
-                }
-            ]
-        },
-        {
-            id: 4,
-            title: 'JavaScript Mastery',
-            description: 'Complete JavaScript path from fundamentals to advanced patterns and ES6+.',
-            duration: '12 weeks',
-            level: 'Beginner to Advanced',
-            students: 10300,
-            difficulty: 'Intermediate',
-            icon: BookOpen,
-            color: 'from-yellow-500/20 to-orange-600/20',
-            borderColor: 'border-yellow-500/20',
-            accentColor: 'text-yellow-500',
-            steps: [
-                {
-                    week: '1-2',
-                    title: 'JavaScript Basics',
-                    topics: ['Variables', 'Data Types', 'Operators', 'Control Flow'],
-                    duration: '12 hours',
-                    tutorials: 15
-                },
-                {
-                    week: '3-4',
-                    title: 'Functions & Scope',
-                    topics: ['Functions', 'Arrow Functions', 'Scope', 'Closures'],
-                    duration: '14 hours',
-                    tutorials: 18
-                },
-                {
-                    week: '5-6',
-                    title: 'Objects & Arrays',
-                    topics: ['Objects', 'Arrays', 'Methods', 'Destructuring'],
-                    duration: '14 hours',
-                    tutorials: 18
-                },
-                {
-                    week: '7-8',
-                    title: 'Async JavaScript',
-                    topics: ['Promises', 'Async/Await', 'Callbacks', 'Fetch API'],
-                    duration: '16 hours',
-                    tutorials: 20
-                },
-                {
-                    week: '9-10',
-                    title: 'DOM & Events',
-                    topics: ['DOM Manipulation', 'Event Handling', 'Event Delegation'],
-                    duration: '12 hours',
-                    tutorials: 15
-                },
-                {
-                    week: '11-12',
-                    title: 'Advanced Patterns',
-                    topics: ['Design Patterns', 'Performance', 'Best Practices'],
-                    duration: '12 hours',
-                    tutorials: 15
-                }
-            ]
-        },
-        {
-            id: 5,
-            title: 'Backend Developer',
-            description: 'Build scalable backend systems with Node.js, Express, and databases.',
-            duration: '20 weeks',
-            level: 'Intermediate to Advanced',
-            students: 5400,
-            difficulty: 'Advanced',
-            icon: Database,
-            color: 'from-green-500/20 to-emerald-600/20',
-            borderColor: 'border-green-500/20',
-            accentColor: 'text-green-500',
-            steps: [
-                {
-                    week: '1-2',
-                    title: 'Node.js Fundamentals',
-                    topics: ['Node.js Basics', 'NPM', 'Modules', 'File System'],
-                    duration: '12 hours',
-                    tutorials: 15
-                },
-                {
-                    week: '3-6',
-                    title: 'Express.js',
-                    topics: ['Express Basics', 'Routing', 'Middleware', 'Error Handling'],
-                    duration: '20 hours',
-                    tutorials: 25
-                },
-                {
-                    week: '7-12',
-                    title: 'Databases',
-                    topics: ['MongoDB', 'PostgreSQL', 'Queries', 'Schema Design'],
-                    duration: '30 hours',
-                    tutorials: 35
-                },
-                {
-                    week: '13-16',
-                    title: 'Advanced Backend',
-                    topics: ['Authentication', 'Authorization', 'API Design', 'Scalability'],
-                    duration: '24 hours',
-                    tutorials: 30
-                },
-                {
-                    week: '17-20',
-                    title: 'DevOps & Deployment',
-                    topics: ['Docker', 'Deployment', 'Monitoring', 'Performance'],
-                    duration: '20 hours',
-                    tutorials: 25
-                }
-            ]
-        },
-        {
-            id: 6,
-            title: 'Web Basics',
-            description: 'Start your web development journey. Perfect for absolute beginners.',
-            duration: '8 weeks',
-            level: 'Beginner',
-            students: 15800,
-            difficulty: 'Beginner',
-            icon: Rocket,
-            color: 'from-indigo-500/20 to-purple-600/20',
-            borderColor: 'border-indigo-500/20',
-            accentColor: 'text-indigo-500',
-            steps: [
-                {
-                    week: '1',
-                    title: 'Internet & Web',
-                    topics: ['How Internet Works', 'Web Standards', 'Browsers'],
-                    duration: '6 hours',
-                    tutorials: 8
-                },
-                {
-                    week: '2-3',
-                    title: 'HTML Essentials',
-                    topics: ['HTML Tags', 'Forms', 'Semantic HTML'],
-                    duration: '12 hours',
-                    tutorials: 15
-                },
-                {
-                    week: '4-5',
-                    title: 'CSS Styling',
-                    topics: ['CSS Basics', 'Selectors', 'Box Model', 'Flexbox'],
-                    duration: '14 hours',
-                    tutorials: 18
-                },
-                {
-                    week: '6-8',
-                    title: 'JavaScript Intro',
-                    topics: ['JS Basics', 'DOM', 'Events', 'Simple Projects'],
-                    duration: '16 hours',
-                    tutorials: 20
-                }
-            ]
-        }
-    ];
+export const dynamic = 'force-dynamic';
 
-    return (
-        <main className="min-h-screen bg-gradient-to-b from-background via-background to-card/30">
-            {/* Hero Section */}
-            <section className="px-4 sm:px-6 lg:px-8 py-20">
-                <div className="mx-auto max-w-6xl">
-                    <div className="text-center mb-12">
-                        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground mb-6">
-                            Learning <span className="text-primary">Paths</span>
-                        </h1>
-                        <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                            Structured learning journeys designed to take you from beginner to expert. Choose your path and start learning today.
-                        </p>
-                    </div>
+function faNumber(value: number) {
+  return new Intl.NumberFormat('fa-IR').format(value);
+}
 
-                    {/* Filter/Info Section */}
-                    <div className="bg-card border border-border rounded-xl p-8 mb-12">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div className="flex items-start gap-4">
-                                <Target className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
-                                <div>
-                                    <h3 className="font-semibold text-foreground mb-2">Self-Paced Learning</h3>
-                                    <p className="text-muted-foreground text-sm">Learn at your own speed. No deadlines, just progress.</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-4">
-                                <CheckCircle2 className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
-                                <div>
-                                    <h3 className="font-semibold text-foreground mb-2">Structured Curriculum</h3>
-                                    <p className="text-muted-foreground text-sm">Build skills progressively with proven learning paths.</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-4">
-                                <Zap className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
-                                <div>
-                                    <h3 className="font-semibold text-foreground mb-2">Hands-On Projects</h3>
-                                    <p className="text-muted-foreground text-sm">Apply what you learn with real-world projects.</p>
-                                </div>
-                            </div>
+export default async function LearningPathsPage() {
+  const subjects = await getPublicSubjects();
+  const paths = await Promise.all(subjects.map(async (subject) => ({
+    subject,
+    content: await getPublicSubject(subject.slug),
+  })));
+
+  return (
+    <div className="page-container pb-20 pt-10 sm:pt-14" dir="rtl">
+      <section className="relative overflow-hidden rounded-[2rem] bg-[#121d32] px-6 py-10 text-white sm:px-10 sm:py-14">
+        <div className="absolute -left-16 -top-20 size-72 rounded-full bg-violet-500/25 blur-3xl" />
+        <div className="absolute bottom-0 right-1/3 size-56 rounded-full bg-emerald-400/15 blur-3xl" />
+        <div className="relative z-10 grid gap-9 lg:grid-cols-[1fr_0.8fr] lg:items-end">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-2 text-xs font-bold text-white/80"><Compass size={14} className="text-[#b7f486]" /> نقشه‌ی راه تو</span>
+            <h1 className="mt-5 max-w-2xl text-4xl font-black leading-tight tracking-tight sm:text-5xl">یادگیریِ هدفمند، با مسیر روشن</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-8 text-white/65 sm:text-base">هر موضوع را به فصل‌های کوتاه و قابل‌پیشرفت تقسیم کرده‌ایم. از اولین قدم شروع کن و با ریتم خودت جلو برو.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-violet-300/15 text-violet-200"><Layers3 size={19} /></span>
+              <span className="mt-4 block text-2xl font-black">{faNumber(subjects.length)}</span>
+              <span className="mt-1 block text-xs font-semibold text-white/55">مسیر برای انتخاب</span>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-[#b7f486]/15 text-[#b7f486]"><Target size={19} /></span>
+              <span className="mt-4 block text-2xl font-black">قدم‌به‌قدم</span>
+              <span className="mt-1 block text-xs font-semibold text-white/55">بدون عجله و فشار</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-12">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <span className="section-kicker"><Sparkles size={14} /> مسیرهای پیشنهادی</span>
+            <h2 className="section-title">بر اساس موضوع مورد علاقه‌ات</h2>
+            <p className="section-copy">این نقشه‌ها از فصل‌ها و درس‌های منتشرشده‌ی سایت ساخته می‌شوند و با محتوای تازه به‌روز می‌مانند.</p>
+          </div>
+          <Link href="/tutorials" className="inline-flex items-center gap-2 self-start rounded-xl px-2 py-3 text-sm font-extrabold text-primary transition hover:gap-3 sm:self-auto">همه‌ی موضوع‌ها <ArrowLeft size={16} /></Link>
+        </div>
+
+        {paths.length > 0 ? (
+          <div className="mt-7 grid gap-5 lg:grid-cols-2">
+            {paths.map(({ subject, content }, pathIndex) => {
+              const chapters = content?.chapters || [];
+              const lessons = content?.lessons || [];
+              const totalMinutes = subject.total_minutes || lessons.reduce((total, lesson) => total + (lesson.duration_minutes || 0), 0);
+              const stepCount = Math.max(chapters.length, 1);
+              const firstLesson = lessons[0];
+
+              return (
+                <article key={subject.id} className="soft-card overflow-hidden">
+                  <div className="relative overflow-hidden bg-gradient-to-l from-primary/10 via-primary/[0.04] to-emerald-400/10 p-6 sm:p-7">
+                    <div className="absolute -left-8 -top-10 size-36 rounded-full border border-primary/10" />
+                    <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex items-start gap-4">
+                        <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white text-primary shadow-sm dark:bg-slate-800"><Compass size={25} /></span>
+                        <div>
+                          <span className="text-[10px] font-black tracking-[0.18em] text-primary">PATH {String(pathIndex + 1).padStart(2, '0')}</span>
+                          <h3 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">{subject.title}</h3>
+                          <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{subject.description || `مسیر یادگیری ${subject.title}، از پایه تا قدم‌های پیشرفته‌تر.`}</p>
                         </div>
+                      </div>
+                      <Link href={firstLesson ? `/tutorials/${subject.slug}/${firstLesson.slug}` : `/tutorials/${subject.slug}`} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground transition hover:gap-3">شروع مسیر <ArrowLeft size={14} /></Link>
                     </div>
-                </div>
-            </section>
+                    <div className="mt-6 flex flex-wrap gap-2 border-t border-primary/10 pt-4 text-xs font-bold text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-card/75 px-3 py-1.5"><Layers3 size={13} className="text-primary" /> {faNumber(stepCount)} فصل</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-card/75 px-3 py-1.5"><BookOpen size={13} className="text-primary" /> {faNumber(lessons.length || subject.lessons_count || 0)} درس</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-card/75 px-3 py-1.5"><Clock3 size={13} className="text-primary" /> حدود {faNumber(Math.ceil(totalMinutes / 60))} ساعت</span>
+                    </div>
+                  </div>
 
-            {/* Learning Paths Grid */}
-            <section className="px-4 sm:px-6 lg:px-8 pb-20">
-                <div className="mx-auto max-w-6xl">
-                    <div className="space-y-12">
-                        {learningPaths.map((path) => {
-                            const Icon = path.icon;
-                            return (
-                                <div key={path.id} className={`bg-gradient-to-br ${path.color} border ${path.borderColor} rounded-2xl overflow-hidden`}>
-                                    {/* Path Header */}
-                                    <div className="bg-card/50 backdrop-blur border-b border-border p-8">
-                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                                            <div className="lg:col-span-2">
-                                                <div className="flex items-start gap-4 mb-4">
-                                                    <div className={`w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0`}>
-                                                        <Icon className={`w-6 h-6 ${path.accentColor}`} />
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="text-3xl font-bold text-foreground mb-2">{path.title}</h2>
-                                                        <p className="text-muted-foreground">{path.description}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* CTA Button */}
-                                            <div className="flex flex-col gap-3">
-                                                <button className={`w-full py-3 px-6 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors bg-primary text-primary-foreground hover:bg-primary/90`}>
-                                                    Start Path <ArrowRight size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Stats */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
-                                            <div>
-                                                <div className="text-xs text-muted-foreground mb-1">Duration</div>
-                                                <div className="flex items-center gap-2 text-foreground font-semibold">
-                                                    <Clock size={16} /> {path.duration}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-muted-foreground mb-1">Level</div>
-                                                <div className="text-foreground font-semibold">{path.level}</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-muted-foreground mb-1">Difficulty</div>
-                                                <div className={`font-semibold ${
-                                                    path.difficulty === 'Beginner' ? 'text-green-500' :
-                                                    path.difficulty === 'Intermediate' ? 'text-yellow-500' :
-                                                    'text-red-500'
-                                                }`}>
-                                                    {path.difficulty}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-muted-foreground mb-1">Learners</div>
-                                                <div className="flex items-center gap-2 text-foreground font-semibold">
-                                                    <Users size={16} /> {(path.students / 1000).toFixed(1)}k
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Path Steps */}
-                                    <div className="p-8">
-                                        <h3 className="text-lg font-bold text-foreground mb-6">Learning Roadmap</h3>
-                                        <div className="space-y-4">
-                                            {path.steps.map((step, idx) => (
-                                                <div key={idx} className="relative">
-                                                    {/* Timeline connector */}
-                                                    {idx < path.steps.length - 1 && (
-                                                        <div className="absolute left-6 top-14 bottom-0 w-0.5 bg-primary/20" />
-                                                    )}
-
-                                                    <div className="flex gap-6">
-                                                        {/* Timeline dot */}
-                                                        <div className="flex flex-col items-center gap-2">
-                                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm ${
-                                                                idx === 0 ? 'bg-primary text-primary-foreground' : 'bg-card border-2 border-primary/20 text-foreground'
-                                                            }`}>
-                                                                {idx + 1}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Step Content */}
-                                                        <div className="flex-1 pb-6">
-                                                            <div className="bg-background/50 border border-border rounded-lg p-5">
-                                                                <div className="flex items-start justify-between mb-3">
-                                                                    <div>
-                                                                        <h4 className="font-bold text-foreground text-lg mb-1">{step.title}</h4>
-                                                                        <p className="text-xs text-muted-foreground">Week {step.week}</p>
-                                                                    </div>
-                                                                    <div className="text-right">
-                                                                        <div className="text-xs font-semibold text-primary mb-1">{step.tutorials} tutorials</div>
-                                                                        <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
-                                                                            <Clock size={12} /> {step.duration}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {step.topics.map((topic, topicIdx) => (
-                                                                        <span key={topicIdx} className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">
-                                                                            {topic}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                  <div className="p-6 sm:p-7">
+                    {chapters.length > 0 ? (
+                      <div className="relative space-y-4">
+                        {chapters.map((chapter, chapterIndex) => {
+                          const chapterLessons = lessons.filter((lesson) => lesson.chapter_id === chapter.id);
+                          return (
+                            <div key={chapter.id} className="relative flex gap-4">
+                              {chapterIndex < chapters.length - 1 && <span className="absolute right-[17px] top-10 h-[calc(100%+1rem)] w-px bg-primary/15" />}
+                              <span className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${chapterIndex === 0 ? 'bg-primary text-primary-foreground' : 'border border-primary/15 bg-primary/5 text-primary'}`}>{faNumber(chapterIndex + 1)}</span>
+                              <div className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-background/70 p-4">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div>
+                                    <h4 className="font-black text-foreground">{chapter.title}</h4>
+                                    {chapter.description && <p className="mt-1 text-xs leading-5 text-muted-foreground">{chapter.description}</p>}
+                                  </div>
+                                  <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold text-muted-foreground">{faNumber(chapterLessons.length)} درس</span>
                                 </div>
-                            );
+                                {chapterLessons.length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {chapterLessons.slice(0, 3).map((lesson) => (
+                                      <Link key={lesson.id} href={`/tutorials/${subject.slug}/${lesson.slug}`} className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-primary/[0.06] px-2.5 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10"><Check size={12} /><span className="truncate">{lesson.title}</span></Link>
+                                    ))}
+                                    {chapterLessons.length > 3 && <span className="px-1 py-1.5 text-[10px] font-bold text-muted-foreground">+{faNumber(chapterLessons.length - 3)} درس دیگر</span>}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
                         })}
-                    </div>
-                </div>
-            </section>
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-7 text-muted-foreground">فصل‌های این موضوع به‌زودی اضافه می‌شوند. فعلاً می‌توانی فهرست درس‌های منتشرشده را ببینی.</p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="soft-card mt-7 p-10 text-center">
+            <BookOpen className="mx-auto text-muted-foreground" size={30} />
+            <p className="mt-3 text-sm text-muted-foreground">هنوز مسیر یادگیری منتشر نشده است.</p>
+          </div>
+        )}
+      </section>
 
-            {/* FAQ Section */}
-            <section className="px-4 sm:px-6 lg:px-8 py-16 bg-card/50">
-                <div className="mx-auto max-w-6xl">
-                    <h2 className="text-3xl font-bold text-foreground mb-8 text-center">Frequently Asked Questions</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-background border border-border rounded-lg p-6">
-                            <h3 className="font-bold text-foreground mb-2">How long does each path take?</h3>
-                            <p className="text-muted-foreground text-sm">Duration varies from 8 to 32 weeks depending on the path. These are estimates for learning 4-5 hours per week.</p>
-                        </div>
-                        <div className="bg-background border border-border rounded-lg p-6">
-                            <h3 className="font-bold text-foreground mb-2">Can I switch between paths?</h3>
-                            <p className="text-muted-foreground text-sm">Yes! You can start one path and switch to another. Your progress is saved and you can resume anytime.</p>
-                        </div>
-                        <div className="bg-background border border-border rounded-lg p-6">
-                            <h3 className="font-bold text-foreground mb-2">Do I need prior experience?</h3>
-                            <p className="text-muted-foreground text-sm">The Web Basics path is perfect for absolute beginners. Other paths assume basic web knowledge.</p>
-                        </div>
-                        <div className="bg-background border border-border rounded-lg p-6">
-                            <h3 className="font-bold text-foreground mb-2">Is there a certificate?</h3>
-                            <p className="text-muted-foreground text-sm">Yes! Complete a path and earn a certificate you can add to your portfolio.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </main>
-    );
+      <section className="mt-12 grid gap-4 rounded-[2rem] border border-border/70 bg-card p-6 sm:grid-cols-3 sm:p-8">
+        {[
+          { title: 'یک موضوع انتخاب کن', text: 'از میان موضوع‌های در دسترس، مورد علاقه‌ات را بردار.', icon: Compass },
+          { title: 'فصل‌ها را دنبال کن', text: 'محتوا به بخش‌های کوچک تقسیم شده تا راحت‌تر پیش بروی.', icon: Layers3 },
+          { title: 'با تمرین تثبیت کن', text: 'مثال‌ها را خودت اجرا کن و آموخته‌ها را مرور کن.', icon: Target },
+        ].map((item, index) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.title} className={`rounded-2xl p-4 ${index === 1 ? 'bg-primary/[0.045] sm:border-x sm:border-border/70' : ''}`}>
+              <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon size={18} /></span>
+              <h3 className="mt-4 text-sm font-black">{item.title}</h3>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">{item.text}</p>
+            </div>
+          );
+        })}
+      </section>
+    </div>
+  );
 }
