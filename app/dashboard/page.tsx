@@ -513,7 +513,7 @@ export default function DashboardPage() {
               { id: 'site' as const, label: 'ظاهر و متن سایت', icon: Settings2 },
             ].map((item) => {
               const Icon = item.icon;
-              return <button key={item.id} type="button" onClick={() => { setSection(item.id); setNotice(null); }} aria-current={section === item.id ? 'page' : undefined} className="dashboard-nav-item justify-center lg:justify-start"><Icon size={17} /><span className="hidden sm:inline">{item.label}</span></button>;
+              return <button key={item.id} type="button" onClick={() => { setSection(item.id); setNotice(null); }} aria-current={section === item.id ? 'page' : undefined} className="dashboard-nav-item justify-center lg:justify-start"><Icon size={17} /><span className="sr-only sm:not-sr-only">{item.label}</span></button>;
             })}
           </nav>
           <div className="mt-3 hidden rounded-2xl border border-border/70 bg-background/70 p-3 lg:block">
@@ -572,7 +572,7 @@ export default function DashboardPage() {
                     <button type="button" onClick={startNewLesson} className="button-primary min-h-10 rounded-xl px-3 py-2 text-xs"><Plus size={15} /> درس جدید</button>
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_130px]">
-                    <div className="relative"><Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="جست‌وجو در عنوان و توضیح..." className="dashboard-input py-2.5 pe-9 text-xs" /></div>
+                    <div className="relative"><Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="جست‌وجو در عنوان و توضیح..." className="dashboard-input py-2.5 ps-10 text-xs" /></div>
                     <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | LessonStatus)} className="dashboard-input py-2.5 text-xs"><option value="all">همه‌ی وضعیت‌ها</option><option value="published">منتشرشده</option><option value="draft">پیش‌نویس</option></select>
                   </div>
                 </div>

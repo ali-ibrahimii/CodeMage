@@ -45,10 +45,11 @@ export default function NewsletterForm() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="ایمیل خودت را وارد کن"
-          className="min-h-12 min-w-0 flex-1 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm text-white outline-none placeholder:text-white/45 focus:border-[#a9ef8f] focus:ring-4 focus:ring-[#a9ef8f]/10"
-          dir="rtl"
+          className="min-h-12 min-w-0 flex-1 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-start text-sm text-white outline-none placeholder:text-white/45 focus:border-[#a9ef8f] focus:ring-4 focus:ring-[#a9ef8f]/10"
+          dir="auto"
+          autoComplete="email"
         />
-        <button type="submit" disabled={isLoading} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#b7f486] px-5 text-sm font-black text-[#182239] transition hover:bg-[#caf79f] disabled:cursor-wait disabled:opacity-70">
+        <button type="submit" disabled={isLoading} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#b7f486] px-5 text-sm font-black text-[#182239] transition hover:bg-[#caf79f] disabled:cursor-wait disabled:opacity-70">
           {isSuccess ? <Check size={16} /> : isLoading ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Send size={15} />}
           {isLoading ? 'در حال ثبت' : 'عضویت'}
           <ArrowLeft size={14} />

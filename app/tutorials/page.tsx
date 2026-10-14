@@ -50,20 +50,22 @@ export default async function TutorialsPage({
     : lessonIndex.slice(0, 8);
 
   return (
-    <div className="page-container pb-20 pt-10 sm:pt-14" dir="rtl">
-      <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-gradient-to-br from-[#f2efff] via-white to-[#ebfaf5] px-6 py-9 dark:from-[#24213b] dark:via-[#20283d] dark:to-[#1b3438] sm:px-10 sm:py-12">
+    <div className="page-container page-shell" dir="rtl">
+      <section className="relative overflow-hidden rounded-3xl sm:rounded-[2rem] border border-border/70 bg-gradient-to-br from-[#f2efff] via-white to-[#ebfaf5] px-5 py-8 dark:from-[#24213b] dark:via-[#20283d] dark:to-[#1b3438] sm:px-10 sm:py-12">
         <div className="absolute -left-10 -top-16 size-56 rounded-full bg-violet-300/25 blur-3xl" />
-        <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_0.75fr] lg:items-end">
+        <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)] lg:items-end">
           <div>
             <span className="section-kicker"><BookOpen size={14} /> کتابخانه‌ی CodeMage</span>
-            <h1 className="mt-4 max-w-2xl text-4xl font-black leading-tight tracking-tight text-foreground sm:text-5xl">یادگیری را با موضوع دلخواهت شروع کن</h1>
+            <h1 className="mt-4 max-w-2xl page-heading text-foreground">یادگیری را با موضوع دلخواهت شروع کن</h1>
             <p className="mt-4 max-w-2xl text-sm leading-8 text-muted-foreground sm:text-base">درس‌های کوتاه و مرحله‌به‌مرحله، همراه با مثال‌های قابل فهم. جست‌وجو کن یا یکی از موضوع‌ها را انتخاب کن.</p>
           </div>
-          <form action="/tutorials" method="get" className="relative">
+          <form action="/tutorials" method="get" className="flex min-w-0 flex-col gap-2 rounded-2xl border border-white/70 bg-white/85 p-2 shadow-lg shadow-violet-900/5 focus-within:border-primary/35 focus-within:ring-4 focus-within:ring-primary/10 min-[400px]:flex-row dark:border-white/10 dark:bg-slate-900/65">
             <label htmlFor="tutorial-search" className="sr-only">جست‌وجو بین موضوع‌ها و درس‌ها</label>
-            <Search size={19} className="absolute right-4 top-1/2 -translate-y-1/2 text-primary" />
-            <input id="tutorial-search" type="search" name="q" defaultValue={query} placeholder="مثلاً: متغیر، حد، زبان C..." className="w-full rounded-2xl border border-white/70 bg-white/85 py-4 pe-12 ps-24 text-sm font-medium text-slate-800 shadow-lg shadow-violet-900/5 outline-none placeholder:text-slate-400 focus:border-primary/35 focus:ring-4 focus:ring-primary/10 dark:border-white/10 dark:bg-slate-900/65 dark:text-white" />
-            <button className="absolute left-2 top-1/2 -translate-y-1/2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground transition hover:opacity-90">جست‌وجو</button>
+            <div className="relative min-w-0 flex-1">
+              <Search size={19} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-primary" />
+              <input id="tutorial-search" type="search" name="q" defaultValue={query} placeholder="مثلاً: متغیر، حد، زبان C..." className="min-h-12 w-full min-w-0 rounded-xl bg-transparent py-3 ps-10 pe-3 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 dark:text-white" />
+            </div>
+            <button type="submit" className="min-h-12 shrink-0 rounded-xl bg-primary px-4 py-3 text-xs font-black text-primary-foreground transition hover:opacity-90">جست‌وجو</button>
           </form>
         </div>
       </section>
@@ -83,17 +85,17 @@ export default async function TutorialsPage({
             const Icon = iconByName[subject.icon || ''] || (subject.kind === 'physics' ? Atom : subject.kind === 'math' ? Sigma : Braces);
             return (
               <Link key={subject.id} href={`/tutorials/${subject.slug}`} className="group block h-full">
-                <article className="soft-card card-hover h-full overflow-hidden">
-                  <div className="relative flex h-40 items-center justify-between overflow-hidden px-6" style={{ '--art-start': colorset.first, '--art-end': colorset.second } as CSSProperties}>
+                <article className="soft-card card-hover flex h-full flex-col overflow-hidden">
+                  <div className="relative flex h-40 shrink-0 items-center justify-between overflow-hidden px-6" style={{ '--art-start': colorset.first, '--art-end': colorset.second } as CSSProperties}>
                     <div className="subject-art absolute inset-0" />
                     <span className="relative z-10 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">TOPIC / {String(index + 1).padStart(2, '0')}</span>
                     <span className="relative z-10 flex size-16 items-center justify-center rounded-[1.4rem] border border-white/70 bg-white/75 text-[color:var(--topic-icon)] shadow-lg shadow-slate-500/10 backdrop-blur" style={{ '--topic-icon': colorset.ink } as CSSProperties}><Icon size={30} strokeWidth={1.7} /></span>
                     <span className="absolute bottom-4 right-6 z-10 rounded-full border border-white/60 bg-white/65 px-3 py-1 text-[11px] font-bold text-slate-700 backdrop-blur">{subject.level || 'همه‌ی سطح‌ها'}</span>
                   </div>
-                  <div className="p-6">
+                  <div className="flex flex-1 flex-col p-5 sm:p-6">
                     <h3 className="text-xl font-black tracking-tight text-foreground transition-colors group-hover:text-primary">{subject.title}</h3>
                     <p className="mt-2 line-clamp-2 min-h-12 text-sm leading-6 text-muted-foreground">{subject.description || 'مجموعه‌ای از درس‌های کاربردی و مرحله‌به‌مرحله.'}</p>
-                    <div className="mt-5 flex items-center justify-between border-t border-border/70 pt-4 text-xs font-bold text-muted-foreground">
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4 text-xs font-bold text-muted-foreground">
                       <span className="flex items-center gap-1.5"><BookOpen size={14} /> {number(subject.lessons_count || 0)} درس</span>
                       <span className="flex items-center gap-1.5"><Layers3 size={14} /> {number(subject.chapters_count || 0)} فصل</span>
                       <span className="flex items-center gap-1 text-primary transition-transform group-hover:-translate-x-1">مشاهده <ArrowLeft size={14} /></span>
@@ -115,7 +117,7 @@ export default async function TutorialsPage({
 
       {visibleLessons.length > 0 && (
         <section className="mt-14">
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <span className="inline-flex items-center gap-2 text-xs font-bold text-primary"><Sparkles size={14} /> {query ? 'درس‌های مرتبط' : 'برای ادامه‌ی مسیر'}</span>
               <h2 className="mt-2 text-2xl font-black tracking-tight">{query ? 'درس‌های پیدا شده' : 'درس‌های محبوب'}</h2>
@@ -128,7 +130,7 @@ export default async function TutorialsPage({
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Code2 size={19} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-black text-foreground group-hover:text-primary">{lesson.title}</span>
-                  <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><span>{lesson.subject_title}</span><span>·</span><span>{number(lesson.duration_minutes || 20)} دقیقه</span><Clock3 size={12} /></span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"><span>{lesson.subject_title}</span><span>·</span><span>{number(lesson.duration_minutes || 20)} دقیقه</span><Clock3 size={12} /></span>
                 </span>
                 <ArrowLeft size={16} className="shrink-0 text-muted-foreground transition group-hover:-translate-x-1 group-hover:text-primary" />
               </Link>

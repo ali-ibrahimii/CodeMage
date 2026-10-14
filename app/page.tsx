@@ -58,14 +58,14 @@ function LessonCard({ lesson, index }: { lesson: PublicLesson; index: number }) 
 
   return (
     <Link href={`/tutorials/${lesson.subject_slug || 'c'}/${lesson.slug}`} className="group block h-full">
-      <article className="soft-card card-hover h-full overflow-hidden">
+      <article className="soft-card card-hover flex h-full flex-col overflow-hidden">
         <div
-          className="subject-art relative flex h-36 items-end justify-between overflow-hidden p-5"
+          className="subject-art relative flex h-36 shrink-0 items-end justify-between overflow-hidden p-5"
           style={{ '--art-start': art.start, '--art-end': art.end } as CSSProperties}
         >
           <div className="absolute -left-5 -top-10 size-36 rounded-full border border-white/40 opacity-60" />
           <div className="absolute -left-1 top-1 size-24 rounded-full border border-white/50 opacity-50" />
-          <div className="relative flex size-12 items-center justify-center rounded-2xl bg-white/75 text-[color:var(--lesson-icon)] shadow-sm backdrop-blur" style={{ '--lesson-icon': art.icon } as CSSProperties}>
+          <div className="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/75 text-[color:var(--lesson-icon)] shadow-sm backdrop-blur" style={{ '--lesson-icon': art.icon } as CSSProperties}>
             <Icon size={23} strokeWidth={1.8} />
           </div>
           <span className="relative rounded-full border border-white/50 bg-white/65 px-3 py-1 text-[11px] font-bold text-slate-700 backdrop-blur">
@@ -73,14 +73,14 @@ function LessonCard({ lesson, index }: { lesson: PublicLesson; index: number }) 
           </span>
           <span className="absolute right-5 top-5 text-[10px] font-bold tracking-[0.22em] text-slate-500/75">LESSON {String(index + 1).padStart(2, '0')}</span>
         </div>
-        <div className="p-5 sm:p-6">
-          <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-1 flex-col p-5 sm:p-6">
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5"><Clock3 size={13} /> {formatNumber(lesson.duration_minutes || 20)} دقیقه</span>
             {lesson.is_featured && <span className="rounded-full bg-[#b7f486]/35 px-2.5 py-1 font-bold text-emerald-800 dark:text-emerald-200">پیشنهاد CodeMage</span>}
           </div>
           <h3 className="text-lg font-black leading-8 tracking-tight text-foreground transition-colors group-hover:text-primary">{lesson.title}</h3>
           <p className="mt-2 line-clamp-2 min-h-12 text-sm leading-6 text-muted-foreground">{lesson.summary || 'یک درس تازه برای ادامه‌ی مسیر یادگیری.'}</p>
-          <span className="mt-5 inline-flex items-center gap-2 text-sm font-extrabold text-primary">
+          <span className="mt-auto inline-flex items-center gap-2 pt-5 text-sm font-extrabold text-primary">
             خواندن درس <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-1" />
           </span>
         </div>
@@ -99,7 +99,7 @@ function SubjectCard({ subject, index }: { subject: PublicSubject; index: number
     <Link href={`/tutorials/${subject.slug}`} className="group block h-full">
       <article className="soft-card card-hover flex h-full flex-col overflow-hidden">
         <div
-          className="subject-art relative flex h-44 items-center justify-center overflow-hidden"
+          className="subject-art relative flex h-44 shrink-0 items-center justify-center overflow-hidden"
           style={{ '--art-start': art.start, '--art-end': art.end } as CSSProperties}
         >
           <div className="absolute -left-9 -top-12 size-44 rounded-full border border-white/55" />
@@ -111,10 +111,10 @@ function SubjectCard({ subject, index }: { subject: PublicSubject; index: number
           <span className="absolute left-5 top-5 rounded-full border border-white/50 bg-white/60 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600 backdrop-blur">{String(index + 1).padStart(2, '0')} / SUBJECT</span>
           <span className="absolute bottom-4 right-5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur">{subject.level || 'برای همه'}</span>
         </div>
-        <div className="flex flex-1 flex-col p-6">
+        <div className="flex flex-1 flex-col p-5 sm:p-6">
           <h3 className="text-xl font-black tracking-tight text-foreground transition-colors group-hover:text-primary">{subject.title}</h3>
           <p className="mt-2 line-clamp-2 min-h-12 text-sm leading-6 text-muted-foreground">{subject.description || 'مجموعه‌ای از درس‌های کوتاه و کاربردی برای یادگیری این موضوع.'}</p>
-          <div className="mt-5 flex items-center justify-between border-t border-border/70 pt-4 text-xs font-bold text-muted-foreground">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4 text-xs font-bold text-muted-foreground">
             <span className="inline-flex items-center gap-1.5"><BookOpen size={14} /> {formatNumber(lessonCount)} درس</span>
             <span className="inline-flex items-center gap-1.5"><Layers3 size={14} /> {formatNumber(chapterCount)} فصل</span>
             <span className="inline-flex items-center gap-1 text-primary transition-transform group-hover:-translate-x-1">ورود <ArrowLeft size={14} /></span>
@@ -140,16 +140,16 @@ export default async function HomePage() {
   return (
     <div dir="rtl">
       <section className="page-container pt-5 sm:pt-8">
-        <div className="hero-panel px-6 py-10 sm:px-10 sm:py-14 lg:px-14 lg:py-[4.5rem]">
-          <div className="relative z-10 grid items-center gap-12 lg:grid-cols-[1fr_0.88fr] lg:gap-16">
+        <div className="hero-panel px-5 py-8 sm:px-8 sm:py-12 lg:px-12 lg:py-16">
+          <div className="relative z-10 grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.88fr)] lg:gap-12">
             <div className="max-w-2xl">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-2 text-xs font-bold text-white/80 backdrop-blur">
+              <div className="mb-5 inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-2 text-xs font-bold text-white/80 backdrop-blur">
                 <Sparkles size={14} className="text-[#b7f486]" />
                 <span>یادگیریِ عمیق، ساده و فارسی</span>
                 <span className="size-1 rounded-full bg-[#b7f486]" />
                 <span className="text-white/50">CodeMage</span>
               </div>
-              <h1 className="max-w-2xl text-[2.6rem] font-black leading-[1.35] tracking-tight text-white sm:text-5xl lg:text-[3.55rem]">
+              <h1 className="max-w-2xl text-[2rem] font-black leading-[1.5] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
                 {settings.hero.title}{' '}
                 <span className="hero-highlight">{settings.hero.highlight}</span>
               </h1>
@@ -168,7 +168,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="relative mx-auto w-full max-w-[490px] px-2 py-4 sm:px-5">
+            <div className="relative mx-auto min-w-0 w-full max-w-[490px] pb-10 pt-14 sm:px-4">
               <div className="absolute -right-2 top-2 size-24 rounded-full bg-violet-400/35 blur-3xl" />
               <div className="absolute -bottom-2 left-0 size-28 rounded-full bg-emerald-300/25 blur-3xl" />
               <div className="hero-window relative z-10">
@@ -185,11 +185,11 @@ export default async function HomePage() {
                   <div className="mt-2 border-t border-white/10 pt-3 text-[#b7f486]"><span className="code-muted">06</span> <span className="code-violet">await</span> yourJourney.start(); <span className="animate-pulse">▍</span></div>
                 </div>
               </div>
-              <div className="float-card absolute -bottom-3 -right-1 z-20 flex items-center gap-3 rounded-2xl px-4 py-3 sm:-right-3">
+              <div className="float-card absolute bottom-0 right-0 z-20 flex items-center gap-3 rounded-2xl px-4 py-3 sm:-right-1">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-[#b7f486]/15 text-[#b7f486]"><BookOpen size={17} /></span>
                 <span><span className="block text-xs font-black text-white">قدم‌به‌قدم تا مهارت</span><span className="mt-1 block text-[10px] text-white/55">هر درس، یک پیشرفت واقعی</span></span>
               </div>
-              <div className="float-card absolute -left-1 top-0 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-3 sm:-left-4">
+              <div className="float-card absolute left-0 top-0 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-3 sm:-left-1">
                 <span className="flex size-8 items-center justify-center rounded-xl bg-violet-400/15 text-violet-200"><Play size={15} fill="currentColor" /></span>
                 <span className="text-xs font-bold text-white">شروع از همین‌جا</span>
               </div>
@@ -198,18 +198,18 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="page-container -mt-1 pt-5">
-        <div className="grid gap-3 rounded-[1.75rem] border border-border/75 bg-card p-4 shadow-[0_20px_50px_-40px_rgba(31,41,75,0.3)] sm:grid-cols-3 sm:p-5">
+      <section className="page-container mt-5">
+        <div className="grid gap-3 rounded-[1.75rem] border border-border/75 bg-card p-3 shadow-[0_20px_50px_-40px_rgba(31,41,75,0.3)] sm:grid-cols-3 sm:p-5">
           <div className="flex items-center gap-4 rounded-2xl px-4 py-3">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><BookOpen size={22} /></span>
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><BookOpen size={22} /></span>
             <span><span className="block text-2xl font-black tracking-tight text-foreground">{formatNumber(stats.lessons_count)}</span><span className="mt-0.5 block text-xs font-semibold text-muted-foreground">درس منتشرشده</span></span>
           </div>
           <div className="flex items-center gap-4 rounded-2xl border-y border-border/70 px-4 py-3 sm:border-y-0 sm:border-x">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-600 dark:text-emerald-300"><Layers3 size={22} /></span>
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-600 dark:text-emerald-300"><Layers3 size={22} /></span>
             <span><span className="block text-2xl font-black tracking-tight text-foreground">{formatNumber(stats.subjects_count)}</span><span className="mt-0.5 block text-xs font-semibold text-muted-foreground">موضوع برای یادگیری</span></span>
           </div>
           <div className="flex items-center gap-4 rounded-2xl px-4 py-3">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-600 dark:text-amber-300"><Clock3 size={22} /></span>
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-600 dark:text-amber-300"><Clock3 size={22} /></span>
             <span><span className="block text-2xl font-black tracking-tight text-foreground">{formatNumber(stats.total_minutes)} <small className="text-sm font-bold">دقیقه</small></span><span className="mt-0.5 block text-xs font-semibold text-muted-foreground">محتوای آموزشی برای مطالعه</span></span>
           </div>
         </div>
@@ -235,7 +235,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="pb-16 sm:pb-20">
+      <section className="pb-12 sm:pb-16 lg:pb-20">
         <div className="page-container">
           <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
@@ -246,7 +246,7 @@ export default async function HomePage() {
             <Link href="/tutorials" className="inline-flex items-center gap-2 self-start rounded-xl px-2 py-3 text-sm font-extrabold text-primary transition hover:gap-3 sm:self-auto">رفتن به کتابخانه <ArrowLeft size={16} /></Link>
           </div>
           {lessons.length > 0 ? (
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className={`mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 ${lessons.length >= 4 ? 'xl:grid-cols-4' : ''}`}>
               {lessons.map((lesson, index) => <LessonCard key={lesson.id} lesson={lesson} index={index} />)}
             </div>
           ) : (
@@ -255,15 +255,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="pb-20 sm:pb-24">
+      <section className="pb-12 sm:pb-16 lg:pb-20">
         <div className="page-container">
-          <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-l from-primary to-[#5545c6] px-6 py-9 text-white shadow-xl shadow-primary/20 sm:px-10 sm:py-11">
+          <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-l from-primary to-[#5545c6] px-5 py-8 text-white shadow-xl shadow-primary/20 sm:px-10 sm:py-11">
             <div className="absolute -left-14 -top-24 size-64 rounded-full border border-white/15" />
             <div className="absolute -left-2 -top-12 size-40 rounded-full border border-white/10" />
             <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold"><Rocket size={14} /> مسیر تو از همین حالا شروع می‌شود</span>
-                <h2 className="mt-4 text-2xl font-black leading-tight sm:text-3xl">{settings.cta.title}</h2>
+                <h2 className="mt-4 text-2xl font-black leading-relaxed sm:text-3xl">{settings.cta.title}</h2>
                 <p className="mt-2 text-sm leading-7 text-white/75 sm:text-base">{settings.cta.text}</p>
               </div>
               <Link href={ctaHref} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-black text-primary transition hover:-translate-y-0.5 hover:bg-[#f1f0ff]">
