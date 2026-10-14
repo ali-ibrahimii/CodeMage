@@ -1,56 +1,38 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { cn } from "@/lib/utils";
-import Header from "@/components/home/Header";
-import Footer from "@/components/home/Footer";
-import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import type { Metadata } from 'next';
+import './globals.css';
+import Header from '@/components/home/Header';
+import Footer from '@/components/home/Footer';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { getPublicSettings } from '@/lib/content';
 
-// برای محیط‌هایی که اینترنت ندارند (مثل CI) فونت گوگل را غیرفعال می‌کنیم
-// تا بیلد نشکند. اگر اینترنت باشد، می‌توان دوباره Geist را فعال کرد.
-const geist = { variable: "" };
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "DevTutorials - Learn Web Development",
-  description: "Master JavaScript, React, Next.js, TypeScript and more with our comprehensive tutorials.",
-  keywords: "JavaScript, React, Next.js, TypeScript, Web Development, Programming",
-  authors: [{ name: "DevTutorials" }],
+  title: {
+    default: 'CodeMage | یادگیری، با قدم‌های کوچک و محکم',
+    template: '%s | CodeMage',
+  },
+  description: 'یادداشت‌های فارسی و کاربردی برای یادگیری برنامه‌نویسی، ریاضی و علوم.',
+  keywords: ['آموزش برنامه‌نویسی', 'زبان C', 'ریاضی', 'فیزیک', 'یادگیری فارسی'],
+  authors: [{ name: 'CodeMage' }],
   openGraph: {
-    title: "DevTutorials - Learn Web Development",
-    description: "Comprehensive tutorials and learning paths for web development",
-    type: "website",
+    title: 'CodeMage | یادگیری، با قدم‌های کوچک و محکم',
+    description: 'درس‌های فارسی و کاربردی برای ساختن مهارت‌های تازه.',
+    type: 'website',
+    locale: 'fa_IR',
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const settings = await getPublicSettings();
+
   return (
-    <html lang="fa" dir="rtl" className={cn("scroll-smooth", "font-sans", geist.variable)}>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#000000" />
-      </head>
-      <body className="flex flex-col min-h-screen bg-background text-foreground">
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <body className="flex min-h-screen flex-col bg-background text-foreground">
         <ThemeProvider>
-          {/* Header Navigation */}
-          <header className="w-full sticky top-0 z-50">
-            <Header />
-          </header>
-
-          {/* Main Content Area */}
-          <main className="flex-1 w-full">
-            <div className="w-full">
-              {children}
-            </div>
-          </main>
-
-          {/* Footer */}
-          <footer className="w-full border-t border-border bg-card/30 mt-auto">
-            <Footer />
-          </footer>
+          <Header brand={{ name: settings.brand.name, tagline: settings.brand.tagline }} />
+          <main className="flex-1">{children}</main>
+          <Footer settings={settings} />
         </ThemeProvider>
       </body>
     </html>

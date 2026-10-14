@@ -1,6 +1,13 @@
 // app/utils/data.ts
 
-export const lessonsData: Record<string, Record<string, any>> = {
+export type LessonData = {
+    title: string;
+    module: string;
+    duration: string;
+    content: string;
+};
+
+export const lessonsData: Record<string, Record<string, LessonData>> = {
     javascript: {
         'intro-js': {
             title: 'مقدمه و آشنایی با جاوااسکریپت',
