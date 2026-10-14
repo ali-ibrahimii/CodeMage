@@ -47,17 +47,17 @@ export default async function TutorialListPage({ params }: { params: Promise<{ n
   const theme = colors[subject.color || 'violet'] || colors.violet;
 
   return (
-    <div className="page-container pb-20 pt-8 sm:pt-12" dir="rtl">
-      <section className={`relative overflow-hidden rounded-[2rem] border border-border/60 bg-gradient-to-br ${theme} px-6 py-8 sm:px-10 sm:py-11`}>
+    <div className="page-container page-shell" dir="rtl">
+      <section className={`relative overflow-hidden rounded-3xl sm:rounded-[2rem] border border-border/60 bg-gradient-to-br ${theme} px-5 py-8 sm:px-10 sm:py-11`}>
         <div className="absolute -left-12 -top-16 size-60 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
               <Link href="/tutorials" className="transition hover:text-primary">همه‌ی موضوع‌ها</Link>
               <span>/</span><span className="text-primary">{subject.title}</span>
             </div>
             <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/60 bg-card/60 px-3 py-1.5 text-[11px] font-black text-primary shadow-sm backdrop-blur"><Sparkles size={13} /> مسیر یادگیری CodeMage</span>
-            <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight text-foreground sm:text-5xl">{subject.title}</h1>
+            <h1 className="mt-4 page-heading text-foreground">{subject.title}</h1>
             <p className="mt-3 max-w-2xl text-sm leading-8 text-muted-foreground sm:text-base">{subject.description || `از پایه تا قدم‌های بعدی، ${subject.title} را با مثال‌های ساده یاد بگیر.`}</p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
               <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/75 px-3.5 py-2"><BookOpen size={14} className="text-primary" />{number(lessons.length)} درس منتشرشده</span>
@@ -67,7 +67,7 @@ export default async function TutorialListPage({ params }: { params: Promise<{ n
             </div>
           </div>
           <div className="flex flex-col items-center gap-4 sm:flex-row lg:flex-col">
-            <span className="flex size-28 items-center justify-center rounded-[2rem] border border-white/70 bg-card/70 text-primary shadow-xl shadow-primary/10 backdrop-blur"><SubjectIcon size={48} strokeWidth={1.5} /></span>
+            <span className="flex size-28 items-center justify-center rounded-3xl sm:rounded-[2rem] border border-white/70 bg-card/70 text-primary shadow-xl shadow-primary/10 backdrop-blur"><SubjectIcon size={48} strokeWidth={1.5} /></span>
             {firstLesson ? (
               <Link href={`/tutorials/${subject.slug}/${firstLesson.slug}`} className="button-primary w-full sm:w-auto lg:w-full"><Play size={16} fill="currentColor" /> شروع اولین درس</Link>
             ) : (

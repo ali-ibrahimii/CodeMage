@@ -31,7 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <ThemeProvider>
           <Header brand={{ name: settings.brand.name, tagline: settings.brand.tagline }} />
-          <main className="flex-1">{children}</main>
+          <main className="min-w-0 flex-1">{children}</main>
           <Footer settings={settings} />
         </ThemeProvider>
       </body>

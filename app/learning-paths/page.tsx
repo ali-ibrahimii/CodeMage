@@ -16,25 +16,25 @@ export default async function LearningPathsPage() {
   })));
 
   return (
-    <div className="page-container pb-20 pt-10 sm:pt-14" dir="rtl">
-      <section className="relative overflow-hidden rounded-[2rem] bg-[#121d32] px-6 py-10 text-white sm:px-10 sm:py-14">
+    <div className="page-container page-shell" dir="rtl">
+      <section className="relative overflow-hidden rounded-3xl sm:rounded-[2rem] bg-[#121d32] px-5 py-8 text-white sm:px-10 sm:py-14">
         <div className="absolute -left-16 -top-20 size-72 rounded-full bg-violet-500/25 blur-3xl" />
         <div className="absolute bottom-0 right-1/3 size-56 rounded-full bg-emerald-400/15 blur-3xl" />
-        <div className="relative z-10 grid gap-9 lg:grid-cols-[1fr_0.8fr] lg:items-end">
+        <div className="relative z-10 grid gap-9 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:items-end">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-2 text-xs font-bold text-white/80"><Compass size={14} className="text-[#b7f486]" /> نقشه‌ی راه تو</span>
-            <h1 className="mt-5 max-w-2xl text-4xl font-black leading-tight tracking-tight sm:text-5xl">یادگیریِ هدفمند، با مسیر روشن</h1>
+            <h1 className="mt-5 max-w-2xl page-heading">یادگیریِ هدفمند، با مسیر روشن</h1>
             <p className="mt-4 max-w-2xl text-sm leading-8 text-white/65 sm:text-base">هر موضوع را به فصل‌های کوتاه و قابل‌پیشرفت تقسیم کرده‌ایم. از اولین قدم شروع کن و با ریتم خودت جلو برو.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur">
               <span className="flex size-10 items-center justify-center rounded-xl bg-violet-300/15 text-violet-200"><Layers3 size={19} /></span>
               <span className="mt-4 block text-2xl font-black">{faNumber(subjects.length)}</span>
               <span className="mt-1 block text-xs font-semibold text-white/55">مسیر برای انتخاب</span>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur">
               <span className="flex size-10 items-center justify-center rounded-xl bg-[#b7f486]/15 text-[#b7f486]"><Target size={19} /></span>
-              <span className="mt-4 block text-2xl font-black">قدم‌به‌قدم</span>
+              <span className="mt-4 block text-xl font-black sm:text-2xl">قدم‌به‌قدم</span>
               <span className="mt-1 block text-xs font-semibold text-white/55">بدون عجله و فشار</span>
             </div>
           </div>
@@ -62,11 +62,11 @@ export default async function LearningPathsPage() {
 
               return (
                 <article key={subject.id} className="soft-card overflow-hidden">
-                  <div className="relative overflow-hidden bg-gradient-to-l from-primary/10 via-primary/[0.04] to-emerald-400/10 p-6 sm:p-7">
+                  <div className="relative overflow-hidden bg-gradient-to-l from-primary/10 via-primary/[0.04] to-emerald-400/10 p-5 sm:p-7">
                     <div className="absolute -left-8 -top-10 size-36 rounded-full border border-primary/10" />
-                    <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="relative flex flex-col items-start gap-5">
                       <div className="flex items-start gap-4">
-                        <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white text-primary shadow-sm dark:bg-slate-800"><Compass size={25} /></span>
+                        <span className="flex size-11 shrink-0 sm:size-14 items-center justify-center rounded-2xl bg-white text-primary shadow-sm dark:bg-slate-800"><Compass size={25} /></span>
                         <div>
                           <span className="text-[10px] font-black tracking-[0.18em] text-primary">PATH {String(pathIndex + 1).padStart(2, '0')}</span>
                           <h3 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">{subject.title}</h3>
@@ -82,14 +82,14 @@ export default async function LearningPathsPage() {
                     </div>
                   </div>
 
-                  <div className="p-6 sm:p-7">
+                  <div className="p-5 sm:p-7">
                     {chapters.length > 0 ? (
                       <div className="relative space-y-4">
                         {chapters.map((chapter, chapterIndex) => {
                           const chapterLessons = lessons.filter((lesson) => lesson.chapter_id === chapter.id);
                           return (
                             <div key={chapter.id} className="relative flex gap-4">
-                              {chapterIndex < chapters.length - 1 && <span className="absolute right-[17px] top-10 h-[calc(100%+1rem)] w-px bg-primary/15" />}
+                              {chapterIndex < chapters.length - 1 && <span className="absolute right-[17px] bottom-[-1rem] top-9 w-px bg-primary/15" />}
                               <span className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${chapterIndex === 0 ? 'bg-primary text-primary-foreground' : 'border border-primary/15 bg-primary/5 text-primary'}`}>{faNumber(chapterIndex + 1)}</span>
                               <div className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-background/70 p-4">
                                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -128,7 +128,7 @@ export default async function LearningPathsPage() {
         )}
       </section>
 
-      <section className="mt-12 grid gap-4 rounded-[2rem] border border-border/70 bg-card p-6 sm:grid-cols-3 sm:p-8">
+      <section className="mt-12 grid gap-4 rounded-3xl sm:rounded-[2rem] border border-border/70 bg-card p-6 sm:grid-cols-3 sm:p-8">
         {[
           { title: 'یک موضوع انتخاب کن', text: 'از میان موضوع‌های در دسترس، مورد علاقه‌ات را بردار.', icon: Compass },
           { title: 'فصل‌ها را دنبال کن', text: 'محتوا به بخش‌های کوچک تقسیم شده تا راحت‌تر پیش بروی.', icon: Layers3 },

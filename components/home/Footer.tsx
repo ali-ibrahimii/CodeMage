@@ -7,11 +7,11 @@ export default function Footer({ settings }: { settings: SiteSettings }) {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-10 bg-[#111b2e] text-white">
-      <div className="page-container pt-14 sm:pt-16">
-        <div className="grid gap-8 rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-6 sm:p-8 lg:grid-cols-[1fr_0.9fr] lg:items-center lg:p-10">
+    <footer className="bg-[#111b2e] text-white">
+      <div className="page-container pt-10 sm:pt-14 lg:pt-16">
+        <div className="grid gap-8 rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-center lg:p-10">
           <div>
-            <span className="mb-4 inline-flex size-11 items-center justify-center rounded-2xl bg-[#b7f486] text-[#182239]">
+            <span className="mb-4 inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#b7f486] text-[#182239]">
               <Send size={19} />
             </span>
             <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">{settings.newsletter.title}</h2>
@@ -23,7 +23,7 @@ export default function Footer({ settings }: { settings: SiteSettings }) {
         <div className="grid gap-10 border-b border-white/10 py-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr] lg:py-14">
           <div className="max-w-sm">
             <Link href="/" className="group inline-flex items-center gap-3">
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#725bff] to-[#36c6ab] text-white shadow-lg shadow-black/20 transition-transform group-hover:-rotate-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#725bff] to-[#36c6ab] text-white shadow-lg shadow-black/20 transition-transform group-hover:-rotate-3">
                 <Code2 size={22} />
               </span>
               <span>
