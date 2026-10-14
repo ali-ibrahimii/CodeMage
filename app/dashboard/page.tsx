@@ -29,8 +29,10 @@ import {
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
 import { DEFAULT_SITE_SETTINGS, mergeSiteSettings, type SiteSettings } from '@/lib/site-settings';
 import { slugify } from '@/lib/slug';
+import { normalizeSearch, pageItems, readAllRows } from '@/lib/dashboard';
+import { FilterSelect, ListFilters, Pagination } from '@/components/dashboard/ListControls';
 
-type DashboardSection = 'overview' | 'lessons' | 'site';
+type DashboardSection = 'overview' | 'subjects' | 'chapters' | 'lessons' | 'site';
 type AccessState = 'checking' | 'signed-out' | 'checking-role' | 'admin' | 'denied';
 type LessonStatus = 'draft' | 'published';
 
@@ -58,7 +60,7 @@ type LessonRow = {
   slug: string;
   title: string;
   summary: string | null;
-  content: string;
+  content?: string;
   duration_minutes: number | null;
   status: LessonStatus;
   is_featured: boolean;
@@ -108,6 +110,8 @@ function localErrorMessage(error: { message?: string; code?: string } | null) {
 }
 
 export default function DashboardPage() {
+  const [isDemo, setIsDemo] = useState(false);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [access, setAccess] = useState<AccessState>(hasSupabaseConfig ? 'checking' : 'signed-out');
@@ -128,6 +132,24 @@ export default function DashboardPage() {
   const [lessonForm, setLessonForm] = useState<LessonForm>(emptyLesson);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | LessonStatus>('all');
+  const [subjectFilter, setSubjectFilter] = useState('all');
+  const [chapterFilter, setChapterFilter] = useState('all');
+  const [featuredFilter, setFeaturedFilter] = useState('all');
+  const [lessonSort, setLessonSort] = useState('updated');
+  const [lessonPage, setLessonPage] = useState(1);
+  const [lessonPageSize, setLessonPageSize] = useState(10);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [isOpeningLesson, setIsOpeningLesson] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const [catalogStatus, setCatalogStatus] = useState('all');
+  const [catalogSubject, setCatalogSubject] = useState('all');
+  const [catalogSort, setCatalogSort] = useState('order');
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogPageSize, setCatalogPageSize] = useState(10);
+  const [overviewSubject, setOverviewSubject] = useState('all');
+  const [overviewPeriod, setOverviewPeriod] = useState('all');
+  const [statsAsOf, setStatsAsOf] = useState(() => Date.now());
+  const [settingsGroup, setSettingsGroup] = useState('all');
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const [isCreatingChapter, setIsCreatingChapter] = useState(false);
@@ -157,9 +179,9 @@ export default function DashboardPage() {
     setProfileName(profile.display_name || profile.email || 'مدیر');
 
     const [subjectsResult, chaptersResult, lessonsResult, settingsResult] = await Promise.all([
-      supabase.from('subjects').select('id, slug, title, is_published, order_index').order('order_index', { ascending: true }),
-      supabase.from('chapters').select('id, subject_id, slug, title, order_index, is_published').order('order_index', { ascending: true }),
-      supabase.from('lessons').select('id, subject_id, chapter_id, slug, title, summary, content, duration_minutes, status, is_featured, order_index, view_count, published_at, updated_at').order('updated_at', { ascending: false }),
+      readAllRows<SubjectRow>((from, to) => supabase.from('subjects').select('id, slug, title, is_published, order_index').order('order_index', { ascending: true }).order('id').range(from, to)),
+      readAllRows<ChapterRow>((from, to) => supabase.from('chapters').select('id, subject_id, slug, title, order_index, is_published').order('order_index', { ascending: true }).order('id').range(from, to)),
+      readAllRows<LessonRow>((from, to) => supabase.from('lessons').select('id, subject_id, chapter_id, slug, title, summary, duration_minutes, status, is_featured, order_index, view_count, published_at, updated_at').order('updated_at', { ascending: false }).order('id').range(from, to)),
       supabase.from('site_settings').select('key, value').in('key', ['site.brand', 'home.hero', 'home.cta', 'footer.newsletter']),
     ]);
 
@@ -175,6 +197,7 @@ export default function DashboardPage() {
     if (settingsResult.error) {
       setLoadError(`تنظیمات سایت خوانده نشد: ${localErrorMessage(settingsResult.error)}`);
     }
+    setStatsAsOf(Date.now());
     setAccess('admin');
   }, []);
 
@@ -215,23 +238,74 @@ export default function DashboardPage() {
     return () => window.clearTimeout(timer);
   }, [session?.user.id, loadAdminData]);
 
+  const subjectById = useMemo(() => new Map(subjects.map((subject) => [subject.id, subject])), [subjects]);
+  const chapterById = useMemo(() => new Map(chapters.map((chapter) => [chapter.id, chapter])), [chapters]);
+  const subjectCounts = useMemo(() => {
+    const counts = new Map<string, { lessons: number; chapters: number }>();
+    subjects.forEach((subject) => counts.set(subject.id, { lessons: 0, chapters: 0 }));
+    lessons.forEach((lesson) => { const count = counts.get(lesson.subject_id); if (count) count.lessons++; });
+    chapters.forEach((chapter) => { const count = counts.get(chapter.subject_id); if (count) count.chapters++; });
+    return counts;
+  }, [subjects, lessons, chapters]);
+  const chapterCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    lessons.forEach((lesson) => counts.set(lesson.chapter_id, (counts.get(lesson.chapter_id) || 0) + 1));
+    return counts;
+  }, [lessons]);
+
   const filteredLessons = useMemo(() => {
-    const needle = searchQuery.trim().toLocaleLowerCase('fa-IR');
+    const needle = normalizeSearch(searchQuery);
     return lessons.filter((lesson) => {
-      const subject = subjects.find((item) => item.id === lesson.subject_id)?.title || '';
-      const matchesText = !needle || `${lesson.title} ${lesson.slug} ${lesson.summary || ''} ${subject}`.toLocaleLowerCase('fa-IR').includes(needle);
-      const matchesStatus = statusFilter === 'all' || lesson.status === statusFilter;
-      return matchesText && matchesStatus;
-    });
-  }, [lessons, searchQuery, statusFilter, subjects]);
+      const text = `${lesson.title} ${lesson.slug} ${lesson.summary || ''} ${subjectById.get(lesson.subject_id)?.title || ''} ${chapterById.get(lesson.chapter_id)?.title || ''}`;
+      return (!needle || normalizeSearch(text).includes(needle))
+        && (statusFilter === 'all' || lesson.status === statusFilter)
+        && (subjectFilter === 'all' || lesson.subject_id === subjectFilter)
+        && (chapterFilter === 'all' || lesson.chapter_id === chapterFilter)
+        && (featuredFilter === 'all' || lesson.is_featured === (featuredFilter === 'featured'));
+    }).sort((a, b) => lessonSort === 'title' ? a.title.localeCompare(b.title, 'fa')
+      : lessonSort === 'views' ? b.view_count - a.view_count
+      : lessonSort === 'order' ? a.order_index - b.order_index
+      : (b.updated_at || '').localeCompare(a.updated_at || ''));
+  }, [lessons, searchQuery, statusFilter, subjectFilter, chapterFilter, featuredFilter, lessonSort, subjectById, chapterById]);
+
+  const filteredCatalog = useMemo(() => {
+    const rows: (SubjectRow | ChapterRow)[] = section === 'chapters' ? chapters : subjects;
+    const needle = normalizeSearch(catalogQuery);
+    return rows.filter((row) => (!needle || normalizeSearch(`${row.title} ${row.slug} ${'subject_id' in row ? subjectById.get(row.subject_id)?.title || '' : ''}`).includes(needle))
+      && (catalogStatus === 'all' || row.is_published === (catalogStatus === 'published'))
+      && (catalogSubject === 'all' || !('subject_id' in row) || row.subject_id === catalogSubject))
+      .sort((a, b) => catalogSort === 'title' ? a.title.localeCompare(b.title, 'fa')
+        : catalogSort === 'lessons' ? (('subject_id' in b ? chapterCounts.get(b.id) : subjectCounts.get(b.id)?.lessons) || 0) - (('subject_id' in a ? chapterCounts.get(a.id) : subjectCounts.get(a.id)?.lessons) || 0)
+        : a.order_index - b.order_index);
+  }, [section, chapters, subjects, catalogQuery, catalogStatus, catalogSubject, catalogSort, subjectById, subjectCounts, chapterCounts]);
+
+  const overviewLessons = useMemo(() => {
+    const cutoff = overviewPeriod === 'all' ? null : statsAsOf - Number(overviewPeriod) * 86400000;
+    return lessons.filter((lesson) => (overviewSubject === 'all' || lesson.subject_id === overviewSubject)
+      && (cutoff === null || (lesson.updated_at && new Date(lesson.updated_at).getTime() >= cutoff)));
+  }, [lessons, overviewSubject, overviewPeriod, statsAsOf]);
+
+  function resetLessonFilters() {
+    setSearchQuery(''); setStatusFilter('all'); setSubjectFilter('all'); setChapterFilter('all');
+    setFeaturedFilter('all'); setLessonSort('updated'); setLessonPage(1);
+  }
+  function resetCatalogFilters() {
+    setCatalogQuery(''); setCatalogStatus('all'); setCatalogSubject('all'); setCatalogSort('order'); setCatalogPage(1);
+  }
+  function navigateSection(next: DashboardSection) {
+    setSection(next); setNotice(null); setEditorOpen(false); resetCatalogFilters();
+  }
+  function showSubjectLessons(subjectId: string, chapterId = 'all') {
+    resetLessonFilters(); setSubjectFilter(subjectId); setChapterFilter(chapterId); navigateSection('lessons');
+  }
 
   const selectedChapters = useMemo(
     () => chapters.filter((chapter) => chapter.subject_id === lessonForm.subject_id),
     [chapters, lessonForm.subject_id],
   );
   const selectedSubject = subjects.find((subject) => subject.id === lessonForm.subject_id);
-  const draftCount = lessons.filter((lesson) => lesson.status === 'draft').length;
-  const publishedCount = lessons.filter((lesson) => lesson.status === 'published').length;
+  const draftCount = overviewLessons.filter((lesson) => lesson.status === 'draft').length;
+  const publishedCount = overviewLessons.filter((lesson) => lesson.status === 'published').length;
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -242,14 +316,41 @@ export default function DashboardPage() {
     if (error) setLoginError(error.message || 'ورود انجام نشد. ایمیل و گذرواژه را بررسی کن.');
   }
 
+  async function openDemo() {
+    if (hasSupabaseConfig) return;
+    setIsLoadingDemo(true);
+    try {
+      const { getPublicSubjects, getPublicSubject } = await import('@/lib/content');
+      const demoSubjects = await getPublicSubjects();
+      const contents = await Promise.all(demoSubjects.map((subject) => getPublicSubject(subject.slug)));
+      setSubjects(demoSubjects.map((subject) => ({ ...subject, is_published: subject.is_published ?? true })));
+      setChapters(contents.flatMap((content) => content?.chapters || []).map((chapter) => ({ ...chapter, is_published: chapter.is_published ?? true })));
+      setLessons(contents.flatMap((content) => content?.lessons || []).map((lesson) => ({ ...lesson, view_count: 0, published_at: null, updated_at: null })));
+      setProfileName('بازدیدکننده');
+      setAccess('admin');
+      setIsDemo(true);
+    } finally {
+      setIsLoadingDemo(false);
+    }
+  }
+
   async function handleSignOut() {
+    if (isDemo) {
+      setIsDemo(false); setAccess('signed-out'); setSection('overview'); setEditorOpen(false);
+      setSubjects([]); setChapters([]); setLessons([]); resetLessonFilters(); resetCatalogFilters();
+      setOverviewSubject('all'); setOverviewPeriod('all'); return;
+    }
     await supabase.auth.signOut();
     setNotice(null);
   }
 
   function startNewLesson() {
-    const subject = subjects.find((item) => item.is_published) || subjects[0];
-    const chapter = chapters.find((item) => item.subject_id === subject?.id && item.is_published) || chapters.find((item) => item.subject_id === subject?.id);
+    if (isDemo) return;
+    setEditorOpen(true);
+    const subject = subjectById.get(subjectFilter) || subjects.find((item) => item.is_published) || subjects[0];
+    const chapter = chapters.find((item) => item.id === chapterFilter && item.subject_id === subject?.id)
+      || chapters.find((item) => item.subject_id === subject?.id && item.is_published)
+      || chapters.find((item) => item.subject_id === subject?.id);
     setShowCreateChapter(false);
     setNewChapterTitle('');
     setEditingId(null);
@@ -258,7 +359,18 @@ export default function DashboardPage() {
     setSection('lessons');
   }
 
-  function startEditing(lesson: LessonRow) {
+  async function startEditing(lesson: LessonRow) {
+    setIsOpeningLesson(true);
+    setNotice(null);
+    const { data, error } = isDemo
+      ? { data: { content: lesson.content || '' }, error: null }
+      : await supabase.from('lessons').select('content').eq('id', lesson.id).single();
+    setIsOpeningLesson(false);
+    if (error || !data) {
+      setNotice({ kind: 'error', text: localErrorMessage(error) || 'محتوای درس خوانده نشد.' });
+      return;
+    }
+    setEditorOpen(true);
     setShowCreateChapter(false);
     setNewChapterTitle('');
     setEditingId(lesson.id);
@@ -268,7 +380,7 @@ export default function DashboardPage() {
       title: lesson.title,
       slug: lesson.slug,
       summary: lesson.summary || '',
-      content: lesson.content || '',
+      content: data.content || '',
       duration_minutes: String(lesson.duration_minutes || 20),
       status: lesson.status,
       is_featured: lesson.is_featured,
@@ -294,6 +406,7 @@ export default function DashboardPage() {
   }
 
   async function createChapter() {
+    if (isDemo) return;
     const title = newChapterTitle.trim();
     if (!title || !lessonForm.subject_id) return;
     setIsCreatingChapter(true);
@@ -327,6 +440,7 @@ export default function DashboardPage() {
 
   async function handleSaveLesson(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isDemo) return;
     setNotice(null);
 
     if (!lessonForm.subject_id || !lessonForm.chapter_id) {
@@ -367,11 +481,13 @@ export default function DashboardPage() {
     setNotice({ kind: 'success', text: editingId ? 'تغییرات درس با موفقیت ذخیره شد.' : 'درس تازه با موفقیت ساخته شد.' });
     setEditingId(null);
     setLessonForm(emptyLesson);
+    setEditorOpen(false);
     if (session?.user.id) await loadAdminData(session.user.id);
   }
 
   async function handleSaveSite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isDemo) return;
     setNotice(null);
     setIsSaving(true);
     const rows = [
@@ -403,7 +519,7 @@ export default function DashboardPage() {
     setSiteDraft((current) => ({ ...current, newsletter: { ...current.newsletter, [field]: value } }));
   }
 
-  if (!hasSupabaseConfig) {
+  if (!hasSupabaseConfig && !isDemo) {
     return (
       <div className="page-container py-12 sm:py-20" dir="rtl">
         <div className="soft-card mx-auto max-w-2xl overflow-hidden">
@@ -418,6 +534,7 @@ export default function DashboardPage() {
               <p className="mt-4">۲. فایل‌های <code dir="ltr" className="rounded bg-card px-1.5 py-0.5 text-primary">supabase/schema.sql</code> و سپس <code dir="ltr" className="rounded bg-card px-1.5 py-0.5 text-primary">supabase/seed.sql</code> را اجرا کن.</p>
               <p className="mt-2">۳. در Supabase یک کاربر بساز و نقش او را به <code dir="ltr" className="rounded bg-card px-1.5 py-0.5 text-primary">admin</code> تغییر بده.</p>
             </div>
+            <button type="button" onClick={() => void openDemo()} disabled={isLoadingDemo} className="button-primary mt-6 w-full disabled:opacity-60">{isLoadingDemo ? <LoaderCircle size={16} className="animate-spin" /> : <LayoutDashboard size={16} />} مشاهده‌ی نمونه‌ی فقط‌خواندنی داشبورد</button>
             <Link href="/" className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-primary">بازگشت به سایت <ArrowLeft size={15} /></Link>
           </div>
         </div>
@@ -429,7 +546,7 @@ export default function DashboardPage() {
     return <div className="page-container flex min-h-[55vh] items-center justify-center py-16" dir="rtl"><div className="flex items-center gap-3 text-sm font-bold text-muted-foreground"><LoaderCircle size={20} className="animate-spin text-primary" /> در حال آماده‌سازی پنل...</div></div>;
   }
 
-  if (!session || access === 'signed-out') {
+  if ((!session && !isDemo) || access === 'signed-out') {
     return (
       <div className="page-container py-10 sm:py-16" dir="rtl">
         <div className="mx-auto grid max-w-5xl overflow-hidden rounded-[2rem] border border-border bg-card shadow-[0_28px_80px_-48px_rgba(31,41,75,0.35)] md:grid-cols-[0.95fr_1.05fr]">
@@ -476,7 +593,7 @@ export default function DashboardPage() {
           <h1 className="mt-5 text-2xl font-black">این حساب دسترسی مدیریت ندارد</h1>
           <p className="mt-2 text-sm leading-7 text-muted-foreground">حساب وارد شده پیدا شد، اما نقش آن در جدول <code dir="ltr">profiles</code> باید <code dir="ltr">admin</code> باشد.</p>
           {loadError && <p className="mt-3 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-200">{loadError}</p>}
-          <pre className="mt-5 overflow-x-auto rounded-2xl bg-[#121d32] p-4 text-left text-xs leading-6 text-slate-100" dir="ltr">{`update public.profiles\nset role = 'admin'\nwhere email = '${session.user.email || 'your@email.com'}';`}</pre>
+          <pre className="mt-5 overflow-x-auto rounded-2xl bg-[#121d32] p-4 text-left text-xs leading-6 text-slate-100" dir="ltr">{`update public.profiles\nset role = 'admin'\nwhere email = '${session?.user.email || 'your@email.com'}';`}</pre>
           <div className="mt-6 flex flex-wrap gap-3"><button type="button" onClick={() => void handleSignOut()} className="button-primary"><LogOut size={15} /> خروج از حساب</button><Link href="/" className="button-secondary">بازگشت به سایت <ArrowLeft size={15} /></Link></div>
         </div>
       </div>
@@ -488,8 +605,8 @@ export default function DashboardPage() {
       <header className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <span className="section-kicker"><MonitorCog size={14} /> فضای مدیریت CodeMage</span>
-          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">سلام {profileName}، آماده‌ای؟</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">از اینجا محتوای آموزشی و ظاهر صفحه‌ی اصلی را مدیریت کن.</p>
+          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{section === 'overview' ? 'نمای کلی داشبورد' : section === 'subjects' ? 'مدیریت موضوع‌ها' : section === 'chapters' ? 'مدیریت فصل‌ها' : section === 'lessons' ? 'مدیریت درس‌ها' : 'تنظیمات سایت'}</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">سلام {profileName}؛ هر بخش جداست تا مدیریت محتوای زیاد هم ساده بماند.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/" className="button-secondary min-h-10 px-4 py-2 text-xs"><Globe2 size={15} /> مشاهده‌ی سایت</Link>
@@ -497,6 +614,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {isDemo && <div role="status" className="mb-5 rounded-2xl border border-primary/25 bg-primary/5 p-4 text-xs leading-7"><strong>پیش‌نمایش فقط‌خواندنی</strong> — این داده‌ها نمونه هستند، نه آمار واقعی سایت. جست‌وجو و فیلترها فعال‌اند؛ ساخت و ذخیره‌سازی غیرفعال است.</div>}
       {loadError && <div className="mb-5 rounded-2xl border border-amber-300/60 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">{loadError}</div>}
       {notice && <div role="status" className={`mb-5 flex items-center gap-2 rounded-2xl border p-3.5 text-sm font-bold ${notice.kind === 'success' ? 'border-emerald-300/60 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200' : 'border-rose-300/60 bg-rose-500/10 text-rose-800 dark:text-rose-200'}`}>{notice.kind === 'success' ? <Check size={16} /> : <CircleHelp size={16} />}{notice.text}</div>}
 
@@ -506,14 +624,16 @@ export default function DashboardPage() {
             <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-violet-400 text-white"><Code2 size={19} /></span>
             <span><span className="block text-xs font-black">CodeMage Studio</span><span className="mt-1 block text-[10px] text-muted-foreground">پنل تولید محتوا</span></span>
           </div>
-          <nav className="mt-3 grid grid-cols-3 gap-1 lg:grid-cols-1" aria-label="بخش‌های داشبورد">
+          <nav className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-1" aria-label="بخش‌های داشبورد">
             {[
               { id: 'overview' as const, label: 'نمای کلی', icon: LayoutDashboard },
+              { id: 'subjects' as const, label: 'موضوع‌ها', icon: Layers3 },
+              { id: 'chapters' as const, label: 'فصل‌ها', icon: FileText },
               { id: 'lessons' as const, label: 'مدیریت درس‌ها', icon: BookOpen },
               { id: 'site' as const, label: 'ظاهر و متن سایت', icon: Settings2 },
             ].map((item) => {
               const Icon = item.icon;
-              return <button key={item.id} type="button" onClick={() => { setSection(item.id); setNotice(null); }} aria-current={section === item.id ? 'page' : undefined} className="dashboard-nav-item justify-center lg:justify-start"><Icon size={17} /><span className="sr-only sm:not-sr-only">{item.label}</span></button>;
+              return <button key={item.id} type="button" onClick={() => navigateSection(item.id)} aria-current={section === item.id ? 'page' : undefined} className="dashboard-nav-item justify-center lg:justify-start"><Icon size={17} /><span className="text-xs">{item.label}</span></button>;
             })}
           </nav>
           <div className="mt-3 hidden rounded-2xl border border-border/70 bg-background/70 p-3 lg:block">
@@ -524,60 +644,95 @@ export default function DashboardPage() {
 
         <div className="min-w-0">
           {section === 'overview' && (
-            <section>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <section className="space-y-5">
+              <div className="soft-card p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><h2 className="text-lg font-black">وضعیت محتوای سایت</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">این صفحه فقط خلاصه‌ی مدیریتی است؛ فهرست‌ها و فرم‌ها در بخش‌های جدا قرار دارند.</p></div>
+                  <span className="rounded-full bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">{isDemo ? 'داده‌ی نمونه' : 'دسترسی مدیر'}</span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <FilterSelect label="موضوع آمار" value={overviewSubject} onChange={setOverviewSubject}><option value="all">همه‌ی موضوع‌ها</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</FilterSelect>
+                  <FilterSelect label="زمان آخرین ویرایش محتوا" value={overviewPeriod} onChange={setOverviewPeriod}><option value="all">همه‌ی زمان‌ها</option><option value="7">۷ روز گذشته</option><option value="30">۳۰ روز گذشته</option><option value="90">۹۰ روز گذشته</option></FilterSelect>
+                </div>
+                <p className="mt-3 text-[11px] leading-6 text-muted-foreground">فیلتر زمان، درس‌ها را بر اساس آخرین ویرایش محدود می‌کند؛ آمار بازدید مربوط به کل عمر همین درس‌هاست.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-live="polite">
                 {[
-                  { label: 'همه‌ی درس‌ها', value: lessons.length, icon: BookOpen, color: 'bg-primary/10 text-primary' },
+                  { label: 'درس در محدوده‌ی انتخابی', value: overviewLessons.length, icon: BookOpen, color: 'bg-primary/10 text-primary' },
                   { label: 'منتشرشده', value: publishedCount, icon: Eye, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' },
                   { label: 'پیش‌نویس', value: draftCount, icon: FileText, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-300' },
-                  { label: 'موضوع‌ها', value: subjects.length, icon: Layers3, color: 'bg-violet-500/10 text-violet-600 dark:text-violet-300' },
+                  { label: 'بازدید کل این درس‌ها', value: overviewLessons.reduce((sum, lesson) => sum + (lesson.view_count || 0), 0), icon: Globe2, color: 'bg-violet-500/10 text-violet-600 dark:text-violet-300' },
                 ].map((item) => {
                   const Icon = item.icon;
-                  return <div key={item.label} className="soft-card p-4"><span className={`flex size-10 items-center justify-center rounded-xl ${item.color}`}><Icon size={18} /></span><span className="mt-4 block text-2xl font-black">{faNumber(item.value)}</span><span className="mt-1 block text-xs font-bold text-muted-foreground">{item.label}</span></div>;
+                  return <div key={item.label} className="soft-card p-5"><span className={`flex size-10 items-center justify-center rounded-xl ${item.color}`}><Icon size={18} /></span><span className="mt-4 block text-3xl font-black">{faNumber(item.value)}</span><span className="mt-2 block text-xs font-bold text-muted-foreground">{item.label}</span></div>;
                 })}
               </div>
-
-              <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-                <div className="soft-card overflow-hidden">
-                  <div className="flex items-center justify-between border-b border-border/70 p-5">
-                    <div><h2 className="text-base font-black">آخرین تغییرات</h2><p className="mt-1 text-xs text-muted-foreground">درس‌هایی که اخیراً ویرایش شده‌اند</p></div>
-                    <button type="button" onClick={startNewLesson} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground"><Plus size={14} /> درس تازه</button>
-                  </div>
-                  <div className="divide-y divide-border/65">
-                    {lessons.slice(0, 5).map((lesson) => (
-                      <div key={lesson.id} className="flex items-center gap-3 px-5 py-4">
-                        <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${lesson.status === 'published' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}><BookOpen size={16} /></span>
-                        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{lesson.title}</span><span className="mt-1 block text-[10px] text-muted-foreground">{subjects.find((subject) => subject.id === lesson.subject_id)?.title || 'موضوع'} · {lesson.status === 'published' ? 'منتشرشده' : 'پیش‌نویس'}</span></span>
-                        <button type="button" onClick={() => startEditing(lesson)} className="rounded-xl px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary/5">ویرایش</button>
-                      </div>
-                    ))}
-                    {lessons.length === 0 && <div className="p-7 text-center text-sm text-muted-foreground">هنوز درسی ساخته نشده است.</div>}
-                  </div>
+              <div className="grid gap-5 xl:grid-cols-2">
+                <div className="soft-card p-5 sm:p-6">
+                  <h2 className="text-base font-black">وضعیت انتشار</h2>
+                  {overviewLessons.length > 0 ? <>
+                    <div className="mt-6 flex h-4 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${faNumber(publishedCount)} منتشرشده و ${faNumber(draftCount)} پیش‌نویس`}><span className="bg-emerald-500" style={{ width: `${publishedCount / overviewLessons.length * 100}%` }} /><span className="bg-amber-400" style={{ width: `${draftCount / overviewLessons.length * 100}%` }} /></div>
+                    <div className="mt-4 flex flex-wrap gap-5 text-xs font-bold"><span className="flex items-center gap-2"><span className="size-2 rounded-full bg-emerald-500" />منتشرشده · {faNumber(publishedCount)}</span><span className="flex items-center gap-2"><span className="size-2 rounded-full bg-amber-400" />پیش‌نویس · {faNumber(draftCount)}</span></div>
+                  </> : <p className="mt-6 rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">در محدوده‌ی انتخابی، درسی وجود ندارد. فیلترها را تغییر بده.</p>}
+                  <p className="mt-6 text-xs leading-7 text-muted-foreground">برای بررسی و انتشار پیش‌نویس‌ها به مدیریت درس‌ها برو؛ در نمای کلی هیچ فرم ایجاد محتوایی نمایش داده نمی‌شود.</p>
+                  <button type="button" onClick={() => { resetLessonFilters(); setSubjectFilter(overviewSubject); setStatusFilter('draft'); navigateSection('lessons'); }} className="mt-3 inline-flex min-h-10 items-center gap-2 text-xs font-black text-primary">بررسی همه‌ی پیش‌نویس‌های این موضوع <ArrowLeft size={14} /></button>
                 </div>
-
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#18243b] to-[#2b2850] p-6 text-white">
-                  <div className="absolute -left-8 -top-9 size-36 rounded-full bg-violet-400/20 blur-2xl" />
-                  <div className="relative z-10"><span className="flex size-11 items-center justify-center rounded-2xl bg-white/10 text-[#b7f486]"><Sparkles size={20} /></span><h2 className="mt-5 text-xl font-black">سایت را به‌روز نگه دار</h2><p className="mt-2 text-sm leading-7 text-white/60">عنوان‌ها، شعار و متن‌های صفحه‌ی اصلی را بدون دست‌زدن به کد تغییر بده.</p><button type="button" onClick={() => { setSection('site'); setNotice(null); }} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#b7f486] px-4 py-2.5 text-xs font-black text-[#17233a]">ویرایش محتوای سایت <ArrowLeft size={14} /></button></div>
+                <div className="soft-card p-5 sm:p-6">
+                  <h2 className="text-base font-black">ساختار کتابخانه</h2>
+                  <p className="mt-2 text-xs leading-6 text-muted-foreground">موضوع ← فصل ← درس؛ هر سطح، فهرست و فیلتر مستقل دارد.</p>
+                  <div className="mt-5 space-y-3">
+                    {[
+                      { id: 'subjects' as const, title: 'موضوع‌ها', count: subjects.length, hint: 'دسته‌بندی‌های اصلی محتوا', icon: Layers3 },
+                      { id: 'chapters' as const, title: 'فصل‌ها', count: chapters.length, hint: 'ساختار آموزشی هر موضوع', icon: FileText },
+                      { id: 'lessons' as const, title: 'درس‌ها', count: lessons.length, hint: 'جست‌وجو، ویرایش و انتشار', icon: BookOpen },
+                    ].map(({ id, title, count, hint, icon: Icon }) => <button key={id} type="button" onClick={() => { if (id === 'lessons') resetLessonFilters(); navigateSection(id); }} className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-start transition hover:border-primary/40 hover:bg-primary/5"><Icon size={18} className="text-primary" /><span className="min-w-0 flex-1"><span className="text-sm font-black">{title} <span className="text-muted-foreground">· {faNumber(count)}</span></span><span className="mt-1 block text-[11px] text-muted-foreground">{hint}</span></span><ArrowLeft size={15} className="shrink-0 text-muted-foreground" /></button>)}
+                  </div>
                 </div>
               </div>
             </section>
           )}
 
+          {(section === 'subjects' || section === 'chapters') && (
+            <section className="soft-card overflow-hidden">
+              <div className="border-b border-border/70 p-5"><h2 className="text-lg font-black">{section === 'subjects' ? 'فهرست موضوع‌ها' : 'فهرست فصل‌ها'}</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">{section === 'subjects' ? 'موضوع را پیدا کن و فقط درس‌ها یا فصل‌های همان موضوع را ببین.' : 'فصل‌ها را بر اساس موضوع و وضعیت انتشار محدود کن.'}</p></div>
+              <ListFilters query={catalogQuery} onQueryChange={(value) => { setCatalogQuery(value); setCatalogPage(1); }} onReset={resetCatalogFilters}>
+                {section === 'chapters' && <FilterSelect label="موضوع" value={catalogSubject} onChange={(value) => { setCatalogSubject(value); setCatalogPage(1); }}><option value="all">همه‌ی موضوع‌ها</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</FilterSelect>}
+                <FilterSelect label="وضعیت انتشار" value={catalogStatus} onChange={(value) => { setCatalogStatus(value); setCatalogPage(1); }}><option value="all">همه‌ی وضعیت‌ها</option><option value="published">منتشرشده</option><option value="draft">پیش‌نویس</option></FilterSelect>
+                <FilterSelect label="مرتب‌سازی" value={catalogSort} onChange={(value) => { setCatalogSort(value); setCatalogPage(1); }}><option value="order">ترتیب آموزشی</option><option value="title">عنوان</option><option value="lessons">بیشترین درس</option></FilterSelect>
+              </ListFilters>
+              <div className="divide-y divide-border/70">
+                {pageItems(filteredCatalog, catalogPage, catalogPageSize).map((row) => <article key={row.id} className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
+                  <div className="min-w-0"><h3 className="break-words text-sm font-black">{row.title}</h3><p className="mt-2 break-words text-xs leading-6 text-muted-foreground">{'subject_id' in row ? `${subjectById.get(row.subject_id)?.title || 'موضوع نامشخص'} · ` : ''}{row.is_published ? 'منتشرشده' : 'پیش‌نویس'} · {faNumber(('subject_id' in row ? chapterCounts.get(row.id) : subjectCounts.get(row.id)?.lessons) || 0)} درس{!('subject_id' in row) && ` · ${faNumber(subjectCounts.get(row.id)?.chapters || 0)} فصل`}</p></div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {!('subject_id' in row) && <button type="button" onClick={() => { navigateSection('chapters'); setCatalogSubject(row.id); }} className="button-secondary min-h-9 rounded-xl px-3 py-2 text-xs">مشاهده فصل‌ها</button>}
+                    <button type="button" onClick={() => showSubjectLessons('subject_id' in row ? row.subject_id : row.id, 'subject_id' in row ? row.id : 'all')} className="button-secondary min-h-9 rounded-xl px-3 py-2 text-xs">مشاهده درس‌ها <ArrowLeft size={13} /></button>
+                  </div>
+                </article>)}
+                {filteredCatalog.length === 0 && <div className="p-10 text-center"><Search size={24} className="mx-auto text-muted-foreground/50" /><h3 className="mt-3 text-sm font-bold">نتیجه‌ای پیدا نشد.</h3><p className="mt-2 text-xs text-muted-foreground">جست‌وجو یا فیلترها را تغییر بده.</p></div>}
+              </div>
+              <Pagination total={filteredCatalog.length} page={catalogPage} pageSize={catalogPageSize} onPageChange={setCatalogPage} onPageSizeChange={(size) => { setCatalogPageSize(size); setCatalogPage(1); }} />
+            </section>
+          )}
+
           {section === 'lessons' && (
-            <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(350px,0.92fr)]">
+            <section className="space-y-5">
+              {!editorOpen && <>
               <div className="soft-card overflow-hidden">
                 <div className="border-b border-border/70 p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div><h2 className="text-lg font-black">درس‌ها</h2><p className="mt-1 text-xs text-muted-foreground">ایجاد، ویرایش و انتشار محتوای آموزشی</p></div>
-                    <button type="button" onClick={startNewLesson} className="button-primary min-h-10 rounded-xl px-3 py-2 text-xs"><Plus size={15} /> درس جدید</button>
-                  </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_130px]">
-                    <div className="relative"><Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="جست‌وجو در عنوان و توضیح..." className="dashboard-input py-2.5 ps-10 text-xs" /></div>
-                    <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | LessonStatus)} className="dashboard-input py-2.5 text-xs"><option value="all">همه‌ی وضعیت‌ها</option><option value="published">منتشرشده</option><option value="draft">پیش‌نویس</option></select>
+                    <button type="button" onClick={startNewLesson} disabled={isDemo} className="button-primary min-h-10 rounded-xl px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40"><Plus size={15} /> درس جدید</button>
                   </div>
                 </div>
-                <div className="max-h-[780px] divide-y divide-border/65 overflow-y-auto">
-                  {filteredLessons.map((lesson) => (
+                <ListFilters query={searchQuery} onQueryChange={(value) => { setSearchQuery(value); setLessonPage(1); }} onReset={resetLessonFilters}>
+                  <FilterSelect label="موضوع" value={subjectFilter} onChange={(value) => { setSubjectFilter(value); setChapterFilter('all'); setLessonPage(1); }}><option value="all">همه‌ی موضوع‌ها</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</FilterSelect>
+                  <FilterSelect label="فصل" value={chapterFilter} onChange={(value) => { setChapterFilter(value); setLessonPage(1); }}><option value="all">همه‌ی فصل‌ها</option>{chapters.filter((chapter) => subjectFilter === 'all' || chapter.subject_id === subjectFilter).map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.title} · {subjectById.get(chapter.subject_id)?.title}</option>)}</FilterSelect>
+                  <FilterSelect label="وضعیت انتشار" value={statusFilter} onChange={(value) => { setStatusFilter(value as 'all' | LessonStatus); setLessonPage(1); }}><option value="all">همه‌ی وضعیت‌ها</option><option value="published">منتشرشده</option><option value="draft">پیش‌نویس</option></FilterSelect>
+                  <FilterSelect label="نمایش ویژه" value={featuredFilter} onChange={(value) => { setFeaturedFilter(value); setLessonPage(1); }}><option value="all">همه‌ی درس‌ها</option><option value="featured">فقط ویژه</option><option value="normal">غیر ویژه</option></FilterSelect>
+                  <FilterSelect label="مرتب‌سازی" value={lessonSort} onChange={(value) => { setLessonSort(value); setLessonPage(1); }}><option value="updated">آخرین ویرایش</option><option value="title">عنوان</option><option value="views">بیشترین بازدید</option><option value="order">ترتیب آموزشی</option></FilterSelect>
+                </ListFilters>
+                <div className="divide-y divide-border/65">
+                  {pageItems(filteredLessons, lessonPage, lessonPageSize).map((lesson) => (
                     <article key={lesson.id} className="p-4 transition hover:bg-muted/25 sm:p-5">
                       <div className="flex items-start gap-3">
                         <span className={`mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl ${lesson.status === 'published' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-600 dark:text-amber-300'}`}><BookOpen size={17} /></span>
@@ -585,30 +740,32 @@ export default function DashboardPage() {
                           <h3 className="line-clamp-1 text-sm font-black">{lesson.title}</h3>
                           <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted-foreground">{lesson.summary || 'بدون توضیح کوتاه'}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-muted-foreground">
-                            <span>{subjects.find((subject) => subject.id === lesson.subject_id)?.title || 'موضوع حذف‌شده'}</span><span>{lesson.status === 'published' ? 'منتشرشده' : 'پیش‌نویس'}</span><span>{faNumber(lesson.duration_minutes || 20)} دقیقه</span>{lesson.is_featured && <span className="text-primary">ویژه</span>}
+                            <span>{subjectById.get(lesson.subject_id)?.title || 'موضوع حذف‌شده'}</span><span>{chapterById.get(lesson.chapter_id)?.title}</span><span>{lesson.status === 'published' ? 'منتشرشده' : 'پیش‌نویس'}</span><span>{faNumber(lesson.duration_minutes || 20)} دقیقه</span>{lesson.is_featured && <span className="text-primary">ویژه</span>}
                           </div>
                         </div>
                       </div>
                       <div className="mt-3 flex justify-end gap-2">
-                        {lesson.status === 'published' && <Link href={`/tutorials/${subjects.find((subject) => subject.id === lesson.subject_id)?.slug || 'c'}/${lesson.slug}`} target="_blank" className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground"><Eye size={12} /> پیش‌نمایش</Link>}
-                        <button type="button" onClick={() => startEditing(lesson)} className="rounded-lg bg-primary/8 px-3 py-1.5 text-[10px] font-black text-primary transition hover:bg-primary/15">ویرایش درس</button>
+                        {lesson.status === 'published' && <Link href={`/tutorials/${subjectById.get(lesson.subject_id)?.slug || 'c'}/${lesson.slug}`} target="_blank" className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground"><Eye size={12} /> پیش‌نمایش</Link>}
+                        <button type="button" disabled={isOpeningLesson} onClick={() => void startEditing(lesson)} className="disabled:cursor-wait disabled:opacity-50 rounded-lg bg-primary/8 px-3 py-1.5 text-[10px] font-black text-primary transition hover:bg-primary/15">ویرایش درس</button>
                       </div>
                     </article>
                   ))}
                   {filteredLessons.length === 0 && <div className="p-10 text-center"><Search size={24} className="mx-auto text-muted-foreground/50" /><p className="mt-3 text-sm font-bold">درسی با این مشخصات پیدا نشد.</p></div>}
                 </div>
+                <Pagination total={filteredLessons.length} page={lessonPage} pageSize={lessonPageSize} onPageChange={setLessonPage} onPageSizeChange={(size) => { setLessonPageSize(size); setLessonPage(1); }} />
               </div>
 
-              <div className="soft-card overflow-hidden xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
+              </>}
+              {editorOpen && <div className="soft-card mx-auto max-w-4xl overflow-hidden">
                 <div className="border-b border-border/70 bg-muted/25 p-5">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">LESSON EDITOR</span>
+                  <button type="button" onClick={() => setEditorOpen(false)} className="mb-3 inline-flex items-center gap-2 text-xs font-bold text-primary"><ArrowLeft size={14} /> بازگشت به فهرست درس‌ها</button>
                   <h2 className="mt-1 text-lg font-black">{editingId ? 'ویرایش درس' : 'ساخت درس تازه'}</h2>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">متن درس را با Markdown بنویس؛ مثال کد را بین سه بک‌تیک قرار بده.</p>
                 </div>
-                <form onSubmit={handleSaveLesson} className="space-y-4 p-5">
+                <form onSubmit={handleSaveLesson} className="p-5"><fieldset disabled={isDemo} className="min-w-0 space-y-4">
                   <div><label htmlFor="lesson-subject" className="field-label">موضوع</label><select id="lesson-subject" required value={lessonForm.subject_id} onChange={(event) => handleSubjectChange(event.target.value)} className="dashboard-input"><option value="">انتخاب موضوع...</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}{!subject.is_published ? ' (پیش‌نویس)' : ''}</option>)}</select></div>
                   <div><label htmlFor="lesson-chapter" className="field-label">فصل</label><select id="lesson-chapter" required value={lessonForm.chapter_id} onChange={(event) => { if (event.target.value === '__new__') setShowCreateChapter(true); else { setShowCreateChapter(false); setLessonForm((current) => ({ ...current, chapter_id: event.target.value })); } }} className="dashboard-input"><option value="">انتخاب فصل...</option>{selectedChapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}<option value="__new__">＋ ساخت فصل تازه...</option></select>
-                    {(showCreateChapter || lessonForm.chapter_id === '') && lessonForm.subject_id && <div className="mt-2 flex gap-2"><input value={newChapterTitle} onChange={(event) => setNewChapterTitle(event.target.value)} className="dashboard-input py-2 text-xs" placeholder={`نام فصل جدید برای ${selectedSubject?.title || 'این موضوع'}`} /><button type="button" onClick={() => void createChapter()} disabled={isCreatingChapter || !newChapterTitle.trim()} className="shrink-0 rounded-xl bg-primary/10 px-3 text-xs font-black text-primary disabled:opacity-50">{isCreatingChapter ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}</button></div>}
+                    {(showCreateChapter || lessonForm.chapter_id === '') && lessonForm.subject_id && <div className="mt-2 flex gap-2"><input aria-label="نام فصل جدید" value={newChapterTitle} onChange={(event) => setNewChapterTitle(event.target.value)} className="dashboard-input py-2 text-xs" placeholder={`نام فصل جدید برای ${selectedSubject?.title || 'این موضوع'}`} /><button type="button" onClick={() => void createChapter()} aria-label="ساخت فصل جدید" disabled={isDemo || isCreatingChapter || !newChapterTitle.trim()} className="shrink-0 rounded-xl bg-primary/10 px-3 text-xs font-black text-primary disabled:opacity-50">{isCreatingChapter ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}</button></div>}
                   </div>
                   <div><label htmlFor="lesson-title" className="field-label">عنوان درس</label><input id="lesson-title" required value={lessonForm.title} onChange={(event) => updateLessonTitle(event.target.value)} className="dashboard-input" placeholder="مثلاً: آشنایی با متغیرها" /></div>
                   <div><label htmlFor="lesson-slug" className="field-label">نشانی کوتاه (Slug)</label><input id="lesson-slug" required value={lessonForm.slug} onChange={(event) => setLessonForm((current) => ({ ...current, slug: slugify(event.target.value) }))} className="dashboard-input text-left font-mono text-xs" placeholder="variables-intro" dir="ltr" /><p className="mt-1 text-[10px] text-muted-foreground">نشانی درس: /tutorials/{selectedSubject?.slug || 'topic'}/{slugify(lessonForm.slug || lessonForm.title)}</p></div>
@@ -619,9 +776,9 @@ export default function DashboardPage() {
                     <div><label htmlFor="lesson-status" className="field-label">وضعیت انتشار</label><select id="lesson-status" value={lessonForm.status} onChange={(event) => setLessonForm((current) => ({ ...current, status: event.target.value as LessonStatus }))} className="dashboard-input"><option value="draft">پیش‌نویس</option><option value="published">منتشرشده</option></select></div>
                   </div>
                   <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-background p-3.5"><input type="checkbox" checked={lessonForm.is_featured} onChange={(event) => setLessonForm((current) => ({ ...current, is_featured: event.target.checked }))} className="size-4 accent-violet-600" /><span><span className="block text-xs font-black">نمایش به‌عنوان درس ویژه</span><span className="mt-1 block text-[10px] text-muted-foreground">در صفحه‌ی اصلی بالاتر نمایش داده می‌شود.</span></span></label>
-                  <div className="flex gap-2 pt-1"><button type="submit" disabled={isSaving} className="button-primary flex-1 disabled:opacity-60">{isSaving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />}{editingId ? 'ذخیره‌ی تغییرات' : 'ساخت و ذخیره‌ی درس'}</button>{editingId && <button type="button" onClick={() => { setEditingId(null); setLessonForm(emptyLesson); setNotice(null); }} className="button-secondary px-4">انصراف</button>}</div>
-                </form>
-              </div>
+                  <div className="flex gap-2 pt-1"><button type="submit" disabled={isSaving || isDemo} className="button-primary flex-1 disabled:opacity-60">{isSaving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />}{editingId ? 'ذخیره‌ی تغییرات' : 'ساخت و ذخیره‌ی درس'}</button><button type="button" onClick={() => { setEditorOpen(false); setEditingId(null); setLessonForm(emptyLesson); setNotice(null); }} className="button-secondary px-4">انصراف</button></div>
+                </fieldset></form>
+              </div>}
             </section>
           )}
 
@@ -631,15 +788,16 @@ export default function DashboardPage() {
                 <div><span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary"><Globe2 size={13} /> SITE CONTENT</span><h2 className="mt-2 text-xl font-black">ظاهر و متن سایت</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">متن‌های زیر در صفحه‌ی اصلی، هدر و فوتر نمایش داده می‌شوند.</p></div>
                 <Link href="/" target="_blank" className="inline-flex items-center gap-2 self-start rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground transition hover:text-primary sm:self-auto"><Eye size={14} /> پیش‌نمایش سایت</Link>
               </div>
-              <form onSubmit={handleSaveSite} className="space-y-7 p-5 sm:p-7">
-                <section className="grid gap-4 sm:grid-cols-2">
+              <div className="border-b border-border p-5"><FilterSelect label="بخش تنظیمات" value={settingsGroup} onChange={setSettingsGroup}><option value="all">همه‌ی تنظیمات</option><option value="brand">هویت سایت</option><option value="hero">صفحه‌ی خانه</option><option value="cta">دعوت به یادگیری</option><option value="newsletter">خبرنامه</option></FilterSelect></div>
+              <form onSubmit={handleSaveSite} className="p-5 sm:p-7"><fieldset disabled={isDemo} className="min-w-0 space-y-7">
+                {(settingsGroup === 'all' || settingsGroup === 'brand') && <section data-settings-group="brand" className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2"><span className="text-sm font-black">هویت سایت</span><p className="mt-1 text-xs text-muted-foreground">نام و جمله‌ی معرفی در هدر و فوتر.</p></div>
                   <div><label htmlFor="brand-name" className="field-label">نام سایت</label><input id="brand-name" value={siteDraft.brand.name} onChange={(event) => setBrandField('name', event.target.value)} className="dashboard-input" /></div>
                   <div><label htmlFor="brand-tagline" className="field-label">شعار کوتاه</label><input id="brand-tagline" value={siteDraft.brand.tagline} onChange={(event) => setBrandField('tagline', event.target.value)} className="dashboard-input" /></div>
                   <div className="sm:col-span-2"><label htmlFor="brand-description" className="field-label">توضیح فوتر</label><textarea id="brand-description" rows={2} value={siteDraft.brand.description} onChange={(event) => setBrandField('description', event.target.value)} className="dashboard-input resize-y" /></div>
-                </section>
+                </section>}
 
-                <section className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
+                {(settingsGroup === 'all' || settingsGroup === 'hero') && <section data-settings-group="hero" className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
                   <div className="sm:col-span-2"><span className="text-sm font-black">بخش اصلی صفحه‌ی خانه</span><p className="mt-1 text-xs text-muted-foreground">عنوان، توضیح و دکمه‌های هیرو.</p></div>
                   <div><label htmlFor="hero-title" className="field-label">عنوان اصلی</label><input id="hero-title" value={siteDraft.hero.title} onChange={(event) => setHeroField('title', event.target.value)} className="dashboard-input" /></div>
                   <div><label htmlFor="hero-highlight" className="field-label">بخش برجسته‌ی عنوان</label><input id="hero-highlight" value={siteDraft.hero.highlight} onChange={(event) => setHeroField('highlight', event.target.value)} className="dashboard-input" /></div>
@@ -648,27 +806,27 @@ export default function DashboardPage() {
                   <div><label htmlFor="hero-primary-href" className="field-label">نشانی دکمه‌ی اصلی</label><input id="hero-primary-href" value={siteDraft.hero.primary_href} onChange={(event) => setHeroField('primary_href', event.target.value)} className="dashboard-input text-left font-mono text-xs" dir="ltr" /></div>
                   <div><label htmlFor="hero-secondary" className="field-label">متن دکمه‌ی دوم</label><input id="hero-secondary" value={siteDraft.hero.secondary_cta} onChange={(event) => setHeroField('secondary_cta', event.target.value)} className="dashboard-input" /></div>
                   <div><label htmlFor="hero-secondary-href" className="field-label">نشانی دکمه‌ی دوم</label><input id="hero-secondary-href" value={siteDraft.hero.secondary_href} onChange={(event) => setHeroField('secondary_href', event.target.value)} className="dashboard-input text-left font-mono text-xs" dir="ltr" /></div>
-                </section>
+                </section>}
 
-                <section className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
+                {(settingsGroup === 'all' || settingsGroup === 'cta') && <section data-settings-group="cta" className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
                   <div className="sm:col-span-2"><span className="text-sm font-black">باکس دعوت به یادگیری</span><p className="mt-1 text-xs text-muted-foreground">در بخش پایینی صفحه‌ی اصلی.</p></div>
                   <div><label htmlFor="cta-title" className="field-label">عنوان</label><input id="cta-title" value={siteDraft.cta.title} onChange={(event) => setCtaField('title', event.target.value)} className="dashboard-input" /></div>
                   <div><label htmlFor="cta-button" className="field-label">متن دکمه</label><input id="cta-button" value={siteDraft.cta.button} onChange={(event) => setCtaField('button', event.target.value)} className="dashboard-input" /></div>
                   <div className="sm:col-span-2"><label htmlFor="cta-text" className="field-label">توضیح</label><textarea id="cta-text" rows={2} value={siteDraft.cta.text} onChange={(event) => setCtaField('text', event.target.value)} className="dashboard-input resize-y" /></div>
                   <div><label htmlFor="cta-href" className="field-label">نشانی دکمه</label><input id="cta-href" value={siteDraft.cta.href} onChange={(event) => setCtaField('href', event.target.value)} className="dashboard-input text-left font-mono text-xs" dir="ltr" /></div>
-                </section>
+                </section>}
 
-                <section className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
+                {(settingsGroup === 'all' || settingsGroup === 'newsletter') && <section data-settings-group="newsletter" className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
                   <div className="sm:col-span-2"><span className="text-sm font-black">خبرنامه‌ی فوتر</span><p className="mt-1 text-xs text-muted-foreground">برای استفاده از فرم ایمیل، جدول newsletter_subscribers در Supabase لازم است.</p></div>
                   <div><label htmlFor="newsletter-title" className="field-label">عنوان</label><input id="newsletter-title" value={siteDraft.newsletter.title} onChange={(event) => setNewsletterField('title', event.target.value)} className="dashboard-input" /></div>
                   <div><label htmlFor="newsletter-text" className="field-label">توضیح</label><input id="newsletter-text" value={siteDraft.newsletter.text} onChange={(event) => setNewsletterField('text', event.target.value)} className="dashboard-input" /></div>
-                </section>
+                </section>}
 
                 <div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card/95 p-3 shadow-xl backdrop-blur">
                   <p className="flex items-center gap-2 text-xs text-muted-foreground"><Sparkles size={14} className="text-primary" /> تغییرات پس از ذخیره در سایت نمایش داده می‌شوند.</p>
-                  <button type="submit" disabled={isSaving} className="button-primary min-h-10 rounded-xl px-4 py-2 text-xs disabled:opacity-60">{isSaving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />} ذخیره‌ی متن‌های سایت</button>
+                  <button type="submit" disabled={isSaving || isDemo} className="button-primary min-h-10 rounded-xl px-4 py-2 text-xs disabled:opacity-60">{isSaving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />} ذخیره‌ی متن‌های سایت</button>
                 </div>
-              </form>
+              </fieldset></form>
             </section>
           )}
         </div>

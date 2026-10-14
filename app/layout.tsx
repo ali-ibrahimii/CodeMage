@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import Header from '@/components/home/Header';
-import Footer from '@/components/home/Footer';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
-import { getPublicSettings } from '@/lib/content';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,16 +20,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const settings = await getPublicSettings();
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <ThemeProvider>
-          <Header brand={{ name: settings.brand.name, tagline: settings.brand.tagline }} />
-          <main className="min-w-0 flex-1">{children}</main>
-          <Footer settings={settings} />
+          {children}
         </ThemeProvider>
       </body>
     </html>
