@@ -66,7 +66,7 @@ export default async function HomePage() {
         return {
           id: lesson.id,
           title: lesson.title,
-          category: lesson.tech_slug.toUpperCase(),
+          category: lesson.tech_slug,
           level: lesson.module || 'Beginner',
           rating: 4.9, // این موارد چون در دیتابیس نیستند فعلا ثابت می‌مانند
           students: 1200 + (index * 400),
