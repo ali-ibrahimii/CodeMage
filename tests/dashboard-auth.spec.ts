@@ -53,7 +53,7 @@ async function mockAdmin(page: Page, role = 'admin') {
         id: `subject-created-${subjectWrites.length}`, description: null, icon: 'Braces', color: 'blue',
         kind: 'programming', level: null, order_index: subjects.length + 1, is_published: true, ...body,
       };
-      subjects.push(created as typeof subjects[number]);
+      subjects.push(created as unknown as typeof subjects[number]);
       const wantsRow = String(request.headers().accept || '').includes('pgrst.object');
       await route.fulfill({
         status: 201, contentType: 'application/json',
@@ -139,6 +139,35 @@ test.describe('authenticated dashboard with mocked Supabase', () => {
     await page.getByRole('searchbox', { name: 'جست‌وجو در فهرست' }).fill('موضوع 0');
     await expect(page.locator('article')).toHaveCount(1);
     await expect(page.getByText('صفحه ۱ از ۱')).toBeVisible();
+  });
+
+  test('keeps the current section and unsaved editor when returning to the dashboard tab', async ({ page }) => {
+    const mock = await mockAdmin(page);
+    await page.addInitScript(() => {
+      window.addEventListener('visibilitychange', () => {
+        sessionStorage.setItem('__dashboardVisibilityState', document.visibilityState);
+      });
+    });
+    await page.goto('/dashboard');
+    await expect(page.getByRole('heading', { name: 'نمای کلی داشبورد', exact: true })).toBeVisible();
+
+    const nav = page.getByRole('navigation', { name: 'بخش‌های داشبورد' });
+    await nav.getByRole('button', { name: 'مدیریت درس‌ها', exact: true }).click();
+    await page.getByRole('button', { name: 'ویرایش درس' }).first().click();
+    await page.locator('#lesson-title').fill('عنوان ذخیره‌نشده');
+    const listRequestCount = mock.listRequests.length;
+
+    const otherTab = await page.context().newPage();
+    await otherTab.bringToFront();
+    await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('hidden');
+    await page.bringToFront();
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('__dashboardVisibilityState'))).toBe('visible');
+
+    await expect(page.locator('#lesson-title')).toHaveValue('عنوان ذخیره‌نشده');
+    await expect(page.getByRole('heading', { name: 'مدیریت درس‌ها', exact: true })).toBeVisible();
+    expect(mock.listRequests).toHaveLength(listRequestCount);
+    expect(mock.contentRequests).toHaveLength(1);
+    await otherTab.close();
   });
 
   test('an admin can add a subject such as Python and number the sections of a lesson', async ({ page }) => {
