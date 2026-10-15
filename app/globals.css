@@ -335,7 +335,10 @@
 .lesson-prose ol { margin: 1.15rem 0; padding-inline-start: 1.4rem; }
 .lesson-prose li { margin: 0.4rem 0; padding-inline-start: 0.2rem; }
 .lesson-prose ul { list-style: disc; }
-.lesson-prose ol { list-style: decimal; }
+.lesson-prose ol { list-style: decimal; list-style-type: persian; }
+.lesson-prose ol ol { list-style: lower-alpha; }
+.lesson-prose ul ul { list-style: circle; }
+.lesson-prose li::marker { color: var(--primary); font-weight: 700; }
 .lesson-prose blockquote {
   margin: 1.5rem 0;
   border-inline-start: 3px solid var(--primary);

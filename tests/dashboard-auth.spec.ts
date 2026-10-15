@@ -36,6 +36,7 @@ async function mockAdmin(page: Page, role = 'admin') {
   const listRequests: string[] = [];
   const contentRequests: string[] = [];
   const writes: unknown[] = [];
+  const subjectWrites: Record<string, unknown>[] = [];
   await page.route(`https://${project}.supabase.co/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -45,6 +46,31 @@ async function mockAdmin(page: Page, role = 'admin') {
       return;
     }
     let data: unknown = [];
+    if (request.method() === 'POST' && table === 'subjects') {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      subjectWrites.push(body);
+      const created = {
+        id: `subject-created-${subjectWrites.length}`, description: null, icon: 'Braces', color: 'blue',
+        kind: 'programming', level: null, order_index: subjects.length + 1, is_published: true, ...body,
+      };
+      subjects.push(created as typeof subjects[number]);
+      const wantsRow = String(request.headers().accept || '').includes('pgrst.object');
+      await route.fulfill({
+        status: 201, contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: wantsRow ? JSON.stringify(created) : '',
+      });
+      return;
+    }
+    if (request.method() === 'PATCH' && table === 'subjects') {
+      const update = request.postDataJSON() as Record<string, unknown>;
+      subjectWrites.push(update);
+      const id = url.searchParams.get('id')?.replace('eq.', '');
+      const subject = subjects.find((item) => item.id === id);
+      if (subject) Object.assign(subject, update);
+      await route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' }, body: '' });
+      return;
+    }
     if (request.method() === 'PATCH' && table === 'lessons') {
       const update = request.postDataJSON();
       writes.push(update);
@@ -70,7 +96,7 @@ async function mockAdmin(page: Page, role = 'admin') {
     }
     await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(data) });
   });
-  return { listRequests, contentRequests, writes };
+  return { listRequests, contentRequests, writes, subjectWrites };
 }
 
 test.describe('authenticated dashboard with mocked Supabase', () => {
@@ -113,6 +139,45 @@ test.describe('authenticated dashboard with mocked Supabase', () => {
     await page.getByRole('searchbox', { name: 'جست‌وجو در فهرست' }).fill('موضوع 0');
     await expect(page.locator('article')).toHaveCount(1);
     await expect(page.getByText('صفحه ۱ از ۱')).toBeVisible();
+  });
+
+  test('an admin can add a subject such as Python and number the sections of a lesson', async ({ page }) => {
+    const mock = await mockAdmin(page);
+    await page.goto('/dashboard');
+    const nav = page.getByRole('navigation', { name: 'بخش‌های داشبورد' });
+
+    await nav.getByRole('button', { name: 'موضوع‌ها', exact: true }).click();
+    await page.getByRole('button', { name: 'موضوع جدید', exact: true }).click();
+    await page.locator('#subject-title').fill('زبان پایتون');
+    await expect(page.locator('#subject-slug')).toHaveValue('zban-paytvn');
+    await page.getByRole('button', { name: 'ساخت موضوع' }).click();
+    await expect(page.getByText('موضوع «زبان پایتون» ساخته شد')).toBeVisible();
+    await page.getByRole('searchbox', { name: 'جست‌وجو در فهرست' }).fill('پایتون');
+    await expect(page.locator('article')).toHaveCount(1);
+    expect(mock.subjectWrites).toHaveLength(1);
+    expect(mock.subjectWrites[0]).toMatchObject({ title: 'زبان پایتون', slug: 'zban-paytvn', kind: 'programming', is_published: true });
+
+    // The new subject can be picked (or created inline) when writing a lesson.
+    await nav.getByRole('button', { name: 'مدیریت درس‌ها', exact: true }).click();
+    await page.getByRole('button', { name: 'درس جدید', exact: true }).click();
+    await expect(page.locator('#lesson-subject').getByRole('option', { name: 'زبان پایتون' })).toHaveCount(1);
+    await page.locator('#lesson-subject').selectOption('__new__');
+    await expect(page.getByLabel('نام موضوع جدید')).toBeVisible();
+
+    // Numbered sections and numbered steps render in the preview.
+    await page.locator('#lesson-content').fill('## آشنایی\n\nمراحل:\n1. نصب پایتون\n2. اجرای برنامه');
+    await page.getByRole('tab', { name: 'پیش‌نمایش' }).click();
+    await expect(page.locator('[data-markdown-preview] h2')).toContainText('آشنایی');
+    await expect(page.locator('[data-markdown-preview] ol li')).toHaveText(['نصب پایتون', 'اجرای برنامه']);
+
+    await page.getByRole('tab', { name: 'نوشتن' }).click();
+    await page.getByRole('button', { name: 'شماره‌گذاری تیترها' }).click();
+    await expect(page.locator('#lesson-content')).toHaveValue('## ۱. آشنایی\n\nمراحل:\n1. نصب پایتون\n2. اجرای برنامه');
+
+    await page.locator('#lesson-content').fill('نصب پایتون\nاجرای برنامه');
+    await page.locator('#lesson-content').selectText();
+    await page.getByRole('button', { name: 'فهرست شماره‌دار' }).click();
+    await expect(page.locator('#lesson-content')).toHaveValue('۱. نصب پایتون\n۲. اجرای برنامه');
   });
 
   test('non-admin users cannot access content controls', async ({ page }) => {

@@ -1,6 +1,31 @@
 import { PostgrestError } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
-import { normalizeSearch, pageItems, readAllRows } from '../lib/dashboard';
+import { buildSubjectPayload, normalizeSearch, pageItems, readAllRows, subjectDraftError, type SubjectDraft } from '../lib/dashboard';
+
+const pythonDraft: SubjectDraft = {
+  title: '  زبان پایتون  ', slug: '', description: '  ', icon: 'Braces',
+  color: 'blue', kind: 'programming', level: 'مقدماتی', order_index: '', is_published: true,
+};
+
+test('a new subject is shaped into a valid subjects row', () => {
+  const payload = buildSubjectPayload(pythonDraft, 4);
+  expect(payload.title).toBe('زبان پایتون');
+  expect(payload.slug).toBe('zban-paytvn');
+  expect(payload.description).toBeNull();
+  expect(payload.order_index).toBe(4);
+  expect(payload.kind).toBe('programming');
+  expect(payload.is_published).toBe(true);
+
+  const custom = buildSubjectPayload({ ...pythonDraft, slug: 'python', order_index: '0', level: '  ' }, 4);
+  expect(custom.slug).toBe('python');
+  expect(custom.order_index).toBe(4);
+  expect(custom.level).toBeNull();
+});
+
+test('an untitled subject is rejected before any write happens', () => {
+  expect(subjectDraftError(pythonDraft)).toBe('');
+  expect(subjectDraftError({ ...pythonDraft, title: '   ' })).toContain('عنوان موضوع');
+});
 
 test('dashboard helpers normalize Persian search and clamp pagination', () => {
   expect(normalizeSearch('  كد يک  درس\u200cجدید ')).toBe('کد یک درس جدید');
@@ -73,11 +98,18 @@ for (const width of [320, 768, 1440]) {
     await page.getByRole('button', { name: 'ویرایش درس' }).click();
     await expect(page.locator('#lesson-title')).toHaveValue('قوانین نیوتن');
     await expect(page.locator('#lesson-title')).toBeDisabled();
+    // The read-only demo still previews Markdown but blocks the writing tools.
+    await expect(page.getByRole('button', { name: 'فهرست شماره‌دار' })).toBeDisabled();
+    await page.getByRole('tab', { name: 'پیش‌نمایش' }).click();
+    await expect(page.locator('[data-markdown-preview] h2').first()).toContainText('قانون دوم نیوتن');
+    await page.getByRole('tab', { name: 'نوشتن' }).click();
+    await expect(page.locator('#lesson-content')).toBeDisabled();
     await expect(page.getByRole('searchbox', { name: 'جست‌وجو در فهرست' })).toHaveCount(0);
     await page.getByRole('button', { name: 'بازگشت به فهرست درس‌ها' }).click();
     await expect(page.getByRole('searchbox', { name: 'جست‌وجو در فهرست' })).toHaveValue('نیوتن');
 
     await navigation.getByRole('button', { name: 'موضوع‌ها', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'موضوع جدید', exact: true })).toBeDisabled();
     await page.getByRole('searchbox', { name: 'جست‌وجو در فهرست' }).fill('ریاضی');
     await expect(page.locator('article')).toHaveCount(1);
     await page.getByRole('button', { name: 'مشاهده فصل‌ها' }).click();

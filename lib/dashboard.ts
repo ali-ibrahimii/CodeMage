@@ -1,4 +1,51 @@
 import type { PostgrestError } from '@supabase/supabase-js';
+import { slugify } from '@/lib/slug';
+
+export type SubjectDraft = {
+  title: string;
+  slug: string;
+  description: string;
+  icon: string;
+  color: string;
+  kind: string;
+  level: string;
+  order_index: string;
+  is_published: boolean;
+};
+
+export type SubjectPayload = {
+  slug: string;
+  title: string;
+  description: string | null;
+  icon: string;
+  color: string;
+  kind: string;
+  level: string | null;
+  order_index: number;
+  is_published: boolean;
+};
+
+/** Shapes the subject form into a `subjects` row; empty text stays NULL, not an empty string. */
+export function buildSubjectPayload(draft: SubjectDraft, fallbackOrder: number): SubjectPayload {
+  return {
+    slug: slugify(draft.slug || draft.title, 'topic'),
+    title: draft.title.trim(),
+    description: draft.description.trim() || null,
+    icon: draft.icon,
+    color: draft.color,
+    kind: draft.kind,
+    level: draft.level.trim() || null,
+    order_index: Math.max(1, Number(draft.order_index) || fallbackOrder),
+    is_published: draft.is_published,
+  };
+}
+
+/** Persian message for the reasons a subject cannot be saved yet; empty means valid. */
+export function subjectDraftError(draft: SubjectDraft) {
+  if (!draft.title.trim()) return 'عنوان موضوع را وارد کن؛ مثلاً «زبان پایتون».';
+  if (!slugify(draft.slug || draft.title, 'topic')) return 'نشانی کوتاه (Slug) معتبر نیست.';
+  return '';
+}
 
 /** Normalize common Persian/Arabic keyboard differences before searching. */
 export function normalizeSearch(value: string) {

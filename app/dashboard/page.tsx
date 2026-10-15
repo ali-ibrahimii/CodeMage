@@ -29,19 +29,51 @@ import {
 import { hasSupabaseConfig, supabase } from '@/lib/supabase';
 import { DEFAULT_SITE_SETTINGS, mergeSiteSettings, type SiteSettings } from '@/lib/site-settings';
 import { slugify } from '@/lib/slug';
-import { normalizeSearch, pageItems, readAllRows } from '@/lib/dashboard';
+import { buildSubjectPayload, normalizeSearch, pageItems, readAllRows, subjectDraftError, type SubjectDraft } from '@/lib/dashboard';
 import { FilterSelect, ListFilters, Pagination } from '@/components/dashboard/ListControls';
+import { MarkdownField } from '@/components/dashboard/MarkdownField';
 
 type DashboardSection = 'overview' | 'subjects' | 'chapters' | 'lessons' | 'site';
 type AccessState = 'checking' | 'signed-out' | 'checking-role' | 'admin' | 'denied';
 type LessonStatus = 'draft' | 'published';
+type SubjectKind = 'programming' | 'math' | 'physics' | 'other';
 
 type SubjectRow = {
   id: string;
   slug: string;
   title: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  kind: SubjectKind;
+  level: string | null;
   is_published: boolean;
   order_index: number;
+};
+
+type SubjectForm = SubjectDraft & { kind: SubjectKind };
+
+// Values must match the CHECK constraint and the icon/colour maps used on the public pages.
+const SUBJECT_KINDS: Array<{ value: SubjectKind; label: string }> = [
+  { value: 'programming', label: 'برنامه‌نویسی' },
+  { value: 'math', label: 'ریاضی' },
+  { value: 'physics', label: 'فیزیک' },
+  { value: 'other', label: 'سایر' },
+];
+const SUBJECT_ICONS = ['Braces', 'Code2', 'Atom', 'Sigma', 'BookOpen'];
+const SUBJECT_COLORS = ['blue', 'cyan', 'violet', 'emerald', 'yellow'];
+const SUBJECT_LEVELS = ['مقدماتی', 'متوسط', 'پیشرفته', 'مقدماتی تا پیشرفته'];
+
+const emptySubject: SubjectForm = {
+  title: '',
+  slug: '',
+  description: '',
+  icon: 'Braces',
+  color: 'blue',
+  kind: 'programming',
+  level: '',
+  order_index: '1',
+  is_published: true,
 };
 
 type ChapterRow = {
@@ -153,6 +185,13 @@ export default function DashboardPage() {
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const [isCreatingChapter, setIsCreatingChapter] = useState(false);
+  const [subjectEditorOpen, setSubjectEditorOpen] = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [subjectForm, setSubjectForm] = useState<SubjectForm>(emptySubject);
+  const [isSavingSubject, setIsSavingSubject] = useState(false);
+  const [newSubjectTitle, setNewSubjectTitle] = useState('');
+  const [showCreateSubject, setShowCreateSubject] = useState(false);
+  const [isCreatingSubject, setIsCreatingSubject] = useState(false);
 
   const loadAdminData = useCallback(async (userId: string) => {
     setAccess('checking-role');
@@ -179,7 +218,7 @@ export default function DashboardPage() {
     setProfileName(profile.display_name || profile.email || 'مدیر');
 
     const [subjectsResult, chaptersResult, lessonsResult, settingsResult] = await Promise.all([
-      readAllRows<SubjectRow>((from, to) => supabase.from('subjects').select('id, slug, title, is_published, order_index').order('order_index', { ascending: true }).order('id').range(from, to)),
+      readAllRows<SubjectRow>((from, to) => supabase.from('subjects').select('id, slug, title, description, icon, color, kind, level, is_published, order_index').order('order_index', { ascending: true }).order('id').range(from, to)),
       readAllRows<ChapterRow>((from, to) => supabase.from('chapters').select('id, subject_id, slug, title, order_index, is_published').order('order_index', { ascending: true }).order('id').range(from, to)),
       readAllRows<LessonRow>((from, to) => supabase.from('lessons').select('id, subject_id, chapter_id, slug, title, summary, duration_minutes, status, is_featured, order_index, view_count, published_at, updated_at').order('updated_at', { ascending: false }).order('id').range(from, to)),
       supabase.from('site_settings').select('key, value').in('key', ['site.brand', 'home.hero', 'home.cta', 'footer.newsletter']),
@@ -323,7 +362,7 @@ export default function DashboardPage() {
       const { getPublicSubjects, getPublicSubject } = await import('@/lib/content');
       const demoSubjects = await getPublicSubjects();
       const contents = await Promise.all(demoSubjects.map((subject) => getPublicSubject(subject.slug)));
-      setSubjects(demoSubjects.map((subject) => ({ ...subject, is_published: subject.is_published ?? true })));
+      setSubjects(demoSubjects.map((subject) => ({ ...subject, kind: (subject.kind || 'programming') as SubjectKind, is_published: subject.is_published ?? true })));
       setChapters(contents.flatMap((content) => content?.chapters || []).map((chapter) => ({ ...chapter, is_published: chapter.is_published ?? true })));
       setLessons(contents.flatMap((content) => content?.lessons || []).map((lesson) => ({ ...lesson, view_count: 0, published_at: null, updated_at: null })));
       setProfileName('بازدیدکننده');
@@ -352,7 +391,9 @@ export default function DashboardPage() {
       || chapters.find((item) => item.subject_id === subject?.id && item.is_published)
       || chapters.find((item) => item.subject_id === subject?.id);
     setShowCreateChapter(false);
+    setShowCreateSubject(false);
     setNewChapterTitle('');
+    setNewSubjectTitle('');
     setEditingId(null);
     setLessonForm({ ...emptyLesson, subject_id: subject?.id || '', chapter_id: chapter?.id || '' });
     setNotice(null);
@@ -372,7 +413,9 @@ export default function DashboardPage() {
     }
     setEditorOpen(true);
     setShowCreateChapter(false);
+    setShowCreateSubject(false);
     setNewChapterTitle('');
+    setNewSubjectTitle('');
     setEditingId(lesson.id);
     setLessonForm({
       subject_id: lesson.subject_id,
@@ -401,7 +444,9 @@ export default function DashboardPage() {
     const firstChapter = chapters.find((chapter) => chapter.subject_id === subjectId && chapter.is_published)
       || chapters.find((chapter) => chapter.subject_id === subjectId);
     setShowCreateChapter(false);
+    setShowCreateSubject(false);
     setNewChapterTitle('');
+    setNewSubjectTitle('');
     setLessonForm((current) => ({ ...current, subject_id: subjectId, chapter_id: firstChapter?.id || '' }));
   }
 
@@ -434,8 +479,112 @@ export default function DashboardPage() {
     setChapters((current) => [...current, chapter]);
     setLessonForm((current) => ({ ...current, chapter_id: chapter.id }));
     setShowCreateChapter(false);
+    setShowCreateSubject(false);
     setNewChapterTitle('');
+    setNewSubjectTitle('');
     setNotice({ kind: 'success', text: 'فصل تازه ساخته شد و برای این درس انتخاب شد.' });
+  }
+
+  function startNewSubject() {
+    if (isDemo) return;
+    setEditingSubjectId(null);
+    setSubjectForm({ ...emptySubject, order_index: String(subjects.length + 1) });
+    setSubjectEditorOpen(true);
+    setNotice(null);
+    setSection('subjects');
+  }
+
+  function startEditingSubject(subject: SubjectRow) {
+    if (isDemo) return;
+    setEditingSubjectId(subject.id);
+    setSubjectForm({
+      title: subject.title,
+      slug: subject.slug,
+      description: subject.description || '',
+      icon: subject.icon || 'Braces',
+      color: subject.color || 'blue',
+      kind: subject.kind || 'programming',
+      level: subject.level || '',
+      order_index: String(subject.order_index ?? subjects.length + 1),
+      is_published: subject.is_published,
+    });
+    setSubjectEditorOpen(true);
+    setNotice(null);
+    setSection('subjects');
+  }
+
+  function updateSubjectTitle(value: string) {
+    setSubjectForm((current) => {
+      const previousAutoSlug = slugify(current.title, 'topic');
+      const shouldUpdateSlug = !current.slug || current.slug === previousAutoSlug;
+      return { ...current, title: value, slug: shouldUpdateSlug ? slugify(value, 'topic') : current.slug };
+    });
+  }
+
+  async function handleSaveSubject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isDemo) return;
+    setNotice(null);
+
+    const draftError = subjectDraftError(subjectForm);
+    if (draftError) {
+      setNotice({ kind: 'error', text: draftError });
+      return;
+    }
+
+    setIsSavingSubject(true);
+    const payload = buildSubjectPayload(subjectForm, subjects.length + 1);
+    const result = editingSubjectId
+      ? await supabase.from('subjects').update(payload).eq('id', editingSubjectId)
+      : await supabase.from('subjects').insert(payload);
+    setIsSavingSubject(false);
+
+    if (result.error) {
+      setNotice({ kind: 'error', text: localErrorMessage(result.error) });
+      return;
+    }
+
+    setNotice({ kind: 'success', text: editingSubjectId ? 'موضوع با موفقیت به‌روز شد.' : `موضوع «${payload.title}» ساخته شد؛ حالا می‌توانی برایش فصل و درس بسازی.` });
+    setSubjectEditorOpen(false);
+    setEditingSubjectId(null);
+    setSubjectForm(emptySubject);
+    if (session?.user.id) await loadAdminData(session.user.id);
+  }
+
+  async function createSubjectFromLesson() {
+    if (isDemo) return;
+    const title = newSubjectTitle.trim();
+    if (!title) return;
+    setIsCreatingSubject(true);
+    setNotice(null);
+    const { data, error } = await supabase
+      .from('subjects')
+      .insert({
+        title,
+        slug: slugify(title, 'topic'),
+        description: null,
+        icon: 'Braces',
+        color: 'blue',
+        kind: 'programming',
+        level: null,
+        order_index: subjects.length + 1,
+        is_published: true,
+      })
+      .select('id, slug, title, description, icon, color, kind, level, is_published, order_index')
+      .single();
+    setIsCreatingSubject(false);
+
+    if (error || !data) {
+      setNotice({ kind: 'error', text: localErrorMessage(error) || 'ساخت موضوع انجام نشد.' });
+      return;
+    }
+
+    const subject = data as SubjectRow;
+    setSubjects((current) => [...current, subject]);
+    setLessonForm((current) => ({ ...current, subject_id: subject.id, chapter_id: '' }));
+    setShowCreateSubject(false);
+    setNewSubjectTitle('');
+    setNotice({ kind: 'success', text: `موضوع «${subject.title}» ساخته شد؛ حالا فصل‌هایش را بساز.` });
   }
 
   async function handleSaveLesson(event: FormEvent<HTMLFormElement>) {
@@ -694,7 +843,32 @@ export default function DashboardPage() {
 
           {(section === 'subjects' || section === 'chapters') && (
             <section className="soft-card overflow-hidden">
-              <div className="border-b border-border/70 p-5"><h2 className="text-lg font-black">{section === 'subjects' ? 'فهرست موضوع‌ها' : 'فهرست فصل‌ها'}</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">{section === 'subjects' ? 'موضوع را پیدا کن و فقط درس‌ها یا فصل‌های همان موضوع را ببین.' : 'فصل‌ها را بر اساس موضوع و وضعیت انتشار محدود کن.'}</p></div>
+              <div className="border-b border-border/70 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><h2 className="text-lg font-black">{section === 'subjects' ? 'فهرست موضوع‌ها' : 'فهرست فصل‌ها'}</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">{section === 'subjects' ? 'موضوع تازه بساز یا موضوع‌های موجود را ویرایش کن؛ هر موضوع می‌تواند فصل و درس‌های خودش را داشته باشد.' : 'فصل‌ها را بر اساس موضوع و وضعیت انتشار محدود کن.'}</p></div>
+                  {section === 'subjects' && <button type="button" onClick={startNewSubject} disabled={isDemo} className="button-primary min-h-10 rounded-xl px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40"><Plus size={15} /> موضوع جدید</button>}
+                </div>
+              </div>
+              {section === 'subjects' && subjectEditorOpen && (
+                <form onSubmit={handleSaveSubject} className="border-b border-border/70 bg-muted/25 p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><h3 className="text-base font-black">{editingSubjectId ? 'ویرایش موضوع' : 'ساخت موضوع تازه'}</h3><p className="mt-1 text-xs leading-6 text-muted-foreground">موضوع، دسته‌بندی اصلی سایت است؛ مثلاً «زبان پایتون». بعد از ساخت، برایش فصل و درس بساز تا در صفحه‌ی موضوع‌ها دیده شود.</p></div>
+                    <button type="button" onClick={() => { setSubjectEditorOpen(false); setEditingSubjectId(null); setSubjectForm(emptySubject); }} className="text-xs font-bold text-primary">بستن فرم</button>
+                  </div>
+                  <fieldset disabled={isDemo} className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2">
+                    <div><label htmlFor="subject-title" className="field-label">عنوان موضوع</label><input id="subject-title" required value={subjectForm.title} onChange={(event) => updateSubjectTitle(event.target.value)} className="dashboard-input" placeholder="مثلاً: زبان پایتون" /></div>
+                    <div><label htmlFor="subject-slug" className="field-label">نشانی کوتاه (Slug)</label><input id="subject-slug" required value={subjectForm.slug} onChange={(event) => setSubjectForm((current) => ({ ...current, slug: slugify(event.target.value, 'topic') }))} className="dashboard-input text-left font-mono text-xs" placeholder="python" dir="ltr" /><p className="mt-1 text-[10px] text-muted-foreground">نشانی صفحه‌ی موضوع: /tutorials/{slugify(subjectForm.slug || subjectForm.title, 'topic')}</p></div>
+                    <div className="sm:col-span-2"><label htmlFor="subject-description" className="field-label">توضیح کوتاه</label><textarea id="subject-description" rows={2} value={subjectForm.description} onChange={(event) => setSubjectForm((current) => ({ ...current, description: event.target.value }))} className="dashboard-input resize-y" placeholder="این موضوع چه چیزی را آموزش می‌دهد؟" /></div>
+                    <div><label htmlFor="subject-kind" className="field-label">نوع محتوا</label><select id="subject-kind" value={subjectForm.kind} onChange={(event) => setSubjectForm((current) => ({ ...current, kind: event.target.value as SubjectKind }))} className="dashboard-input">{SUBJECT_KINDS.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}</select></div>
+                    <div><label htmlFor="subject-level" className="field-label">سطح</label><select id="subject-level" value={subjectForm.level} onChange={(event) => setSubjectForm((current) => ({ ...current, level: event.target.value }))} className="dashboard-input"><option value="">بدون سطح</option>{SUBJECT_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}</select></div>
+                    <div><label htmlFor="subject-icon" className="field-label">آیکون کارت</label><select id="subject-icon" value={subjectForm.icon} onChange={(event) => setSubjectForm((current) => ({ ...current, icon: event.target.value }))} className="dashboard-input">{SUBJECT_ICONS.map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select></div>
+                    <div><label htmlFor="subject-color" className="field-label">رنگ کارت</label><select id="subject-color" value={subjectForm.color} onChange={(event) => setSubjectForm((current) => ({ ...current, color: event.target.value }))} className="dashboard-input">{SUBJECT_COLORS.map((color) => <option key={color} value={color}>{color}</option>)}</select></div>
+                    <div><label htmlFor="subject-order" className="field-label">ترتیب نمایش</label><input id="subject-order" type="number" min="1" max="999" value={subjectForm.order_index} onChange={(event) => setSubjectForm((current) => ({ ...current, order_index: event.target.value }))} className="dashboard-input" dir="ltr" /></div>
+                    <label className="flex cursor-pointer items-center gap-3 self-end rounded-2xl border border-border bg-background p-3.5"><input type="checkbox" checked={subjectForm.is_published} onChange={(event) => setSubjectForm((current) => ({ ...current, is_published: event.target.checked }))} className="size-4 accent-violet-600" /><span><span className="block text-xs font-black">انتشار در سایت</span><span className="mt-1 block text-[10px] text-muted-foreground">اگر خاموش باشد، فقط در پنل دیده می‌شود.</span></span></label>
+                    <div className="flex gap-2 sm:col-span-2"><button type="submit" disabled={isSavingSubject || isDemo} className="button-primary flex-1 disabled:opacity-60">{isSavingSubject ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />}{editingSubjectId ? 'ذخیره‌ی تغییرات موضوع' : 'ساخت موضوع'}</button><button type="button" onClick={() => { setSubjectEditorOpen(false); setEditingSubjectId(null); setSubjectForm(emptySubject); }} className="button-secondary px-4">انصراف</button></div>
+                  </fieldset>
+                </form>
+              )}
               <ListFilters query={catalogQuery} onQueryChange={(value) => { setCatalogQuery(value); setCatalogPage(1); }} onReset={resetCatalogFilters}>
                 {section === 'chapters' && <FilterSelect label="موضوع" value={catalogSubject} onChange={(value) => { setCatalogSubject(value); setCatalogPage(1); }}><option value="all">همه‌ی موضوع‌ها</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</FilterSelect>}
                 <FilterSelect label="وضعیت انتشار" value={catalogStatus} onChange={(value) => { setCatalogStatus(value); setCatalogPage(1); }}><option value="all">همه‌ی وضعیت‌ها</option><option value="published">منتشرشده</option><option value="draft">پیش‌نویس</option></FilterSelect>
@@ -704,6 +878,7 @@ export default function DashboardPage() {
                 {pageItems(filteredCatalog, catalogPage, catalogPageSize).map((row) => <article key={row.id} className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
                   <div className="min-w-0"><h3 className="break-words text-sm font-black">{row.title}</h3><p className="mt-2 break-words text-xs leading-6 text-muted-foreground">{'subject_id' in row ? `${subjectById.get(row.subject_id)?.title || 'موضوع نامشخص'} · ` : ''}{row.is_published ? 'منتشرشده' : 'پیش‌نویس'} · {faNumber(('subject_id' in row ? chapterCounts.get(row.id) : subjectCounts.get(row.id)?.lessons) || 0)} درس{!('subject_id' in row) && ` · ${faNumber(subjectCounts.get(row.id)?.chapters || 0)} فصل`}</p></div>
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    {!('subject_id' in row) && <button type="button" disabled={isDemo} onClick={() => startEditingSubject(subjectById.get(row.id) || (row as SubjectRow))} className="button-secondary min-h-9 rounded-xl px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40">ویرایش موضوع</button>}
                     {!('subject_id' in row) && <button type="button" onClick={() => { navigateSection('chapters'); setCatalogSubject(row.id); }} className="button-secondary min-h-9 rounded-xl px-3 py-2 text-xs">مشاهده فصل‌ها</button>}
                     <button type="button" onClick={() => showSubjectLessons('subject_id' in row ? row.subject_id : row.id, 'subject_id' in row ? row.id : 'all')} className="button-secondary min-h-9 rounded-xl px-3 py-2 text-xs">مشاهده درس‌ها <ArrowLeft size={13} /></button>
                   </div>
@@ -760,17 +935,21 @@ export default function DashboardPage() {
                 <div className="border-b border-border/70 bg-muted/25 p-5">
                   <button type="button" onClick={() => setEditorOpen(false)} className="mb-3 inline-flex items-center gap-2 text-xs font-bold text-primary"><ArrowLeft size={14} /> بازگشت به فهرست درس‌ها</button>
                   <h2 className="mt-1 text-lg font-black">{editingId ? 'ویرایش درس' : 'ساخت درس تازه'}</h2>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">متن درس را با Markdown بنویس؛ مثال کد را بین سه بک‌تیک قرار بده.</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">متن درس Markdown است. با نوار ابزار می‌توانی تیترها را شماره‌گذاری کنی، فهرست شماره‌دار بسازی و پیش‌نمایش بگیری.</p>
                 </div>
-                <form onSubmit={handleSaveLesson} className="p-5"><fieldset disabled={isDemo} className="min-w-0 space-y-4">
-                  <div><label htmlFor="lesson-subject" className="field-label">موضوع</label><select id="lesson-subject" required value={lessonForm.subject_id} onChange={(event) => handleSubjectChange(event.target.value)} className="dashboard-input"><option value="">انتخاب موضوع...</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}{!subject.is_published ? ' (پیش‌نویس)' : ''}</option>)}</select></div>
+                <form onSubmit={handleSaveLesson} className="space-y-4 p-5"><fieldset disabled={isDemo} className="min-w-0 space-y-4">
+                  <div><label htmlFor="lesson-subject" className="field-label">موضوع</label><select id="lesson-subject" required value={showCreateSubject ? '__new__' : lessonForm.subject_id} onChange={(event) => { if (event.target.value === '__new__') { setShowCreateSubject(true); setShowCreateChapter(false); } else { setShowCreateSubject(false); handleSubjectChange(event.target.value); } }} className="dashboard-input"><option value="">انتخاب موضوع...</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}{!subject.is_published ? ' (پیش‌نویس)' : ''}</option>)}<option value="__new__">＋ ساخت موضوع تازه...</option></select>
+                    {showCreateSubject && <div className="mt-2 space-y-2"><div className="flex gap-2"><input aria-label="نام موضوع جدید" value={newSubjectTitle} onChange={(event) => setNewSubjectTitle(event.target.value)} className="dashboard-input py-2 text-xs" placeholder="نام موضوع جدید، مثلاً زبان پایتون" /><button type="button" onClick={() => void createSubjectFromLesson()} aria-label="ساخت موضوع جدید" disabled={isDemo || isCreatingSubject || !newSubjectTitle.trim()} className="shrink-0 rounded-xl bg-primary/10 px-3 text-xs font-black text-primary disabled:opacity-50">{isCreatingSubject ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}</button></div><p className="text-[10px] leading-5 text-muted-foreground">موضوع تازه با نشانی <span dir="ltr" className="font-mono">/tutorials/{slugify(newSubjectTitle, 'topic')}</span> ساخته و منتشر می‌شود؛ آیکون و رنگش را بعداً از بخش «موضوع‌ها» تغییر بده.</p></div>}
+                  </div>
                   <div><label htmlFor="lesson-chapter" className="field-label">فصل</label><select id="lesson-chapter" required value={lessonForm.chapter_id} onChange={(event) => { if (event.target.value === '__new__') setShowCreateChapter(true); else { setShowCreateChapter(false); setLessonForm((current) => ({ ...current, chapter_id: event.target.value })); } }} className="dashboard-input"><option value="">انتخاب فصل...</option>{selectedChapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}<option value="__new__">＋ ساخت فصل تازه...</option></select>
                     {(showCreateChapter || lessonForm.chapter_id === '') && lessonForm.subject_id && <div className="mt-2 flex gap-2"><input aria-label="نام فصل جدید" value={newChapterTitle} onChange={(event) => setNewChapterTitle(event.target.value)} className="dashboard-input py-2 text-xs" placeholder={`نام فصل جدید برای ${selectedSubject?.title || 'این موضوع'}`} /><button type="button" onClick={() => void createChapter()} aria-label="ساخت فصل جدید" disabled={isDemo || isCreatingChapter || !newChapterTitle.trim()} className="shrink-0 rounded-xl bg-primary/10 px-3 text-xs font-black text-primary disabled:opacity-50">{isCreatingChapter ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}</button></div>}
                   </div>
                   <div><label htmlFor="lesson-title" className="field-label">عنوان درس</label><input id="lesson-title" required value={lessonForm.title} onChange={(event) => updateLessonTitle(event.target.value)} className="dashboard-input" placeholder="مثلاً: آشنایی با متغیرها" /></div>
                   <div><label htmlFor="lesson-slug" className="field-label">نشانی کوتاه (Slug)</label><input id="lesson-slug" required value={lessonForm.slug} onChange={(event) => setLessonForm((current) => ({ ...current, slug: slugify(event.target.value) }))} className="dashboard-input text-left font-mono text-xs" placeholder="variables-intro" dir="ltr" /><p className="mt-1 text-[10px] text-muted-foreground">نشانی درس: /tutorials/{selectedSubject?.slug || 'topic'}/{slugify(lessonForm.slug || lessonForm.title)}</p></div>
                   <div><label htmlFor="lesson-summary" className="field-label">توضیح کوتاه</label><textarea id="lesson-summary" rows={2} value={lessonForm.summary} onChange={(event) => setLessonForm((current) => ({ ...current, summary: event.target.value }))} className="dashboard-input resize-y" placeholder="این درس چه چیزی را آموزش می‌دهد؟" /></div>
-                  <div><label htmlFor="lesson-content" className="field-label">محتوای درس <span className="font-normal text-muted-foreground">(Markdown)</span></label><textarea id="lesson-content" rows={12} value={lessonForm.content} onChange={(event) => setLessonForm((current) => ({ ...current, content: event.target.value }))} className="dashboard-input min-h-64 resize-y font-mono text-xs leading-7" placeholder={'## عنوان بخش\n\nتوضیح درس را اینجا بنویس...\n\n```js\nconsole.log("سلام دنیا");\n```'} dir="rtl" /><p className="mt-1 text-[10px] leading-5 text-muted-foreground">تیتر با ##، متن پررنگ با **متن** و کد را بین سه بک‌تیک بنویس.</p></div>
+                </fieldset>
+                <MarkdownField value={lessonForm.content} onChange={(content) => setLessonForm((current) => ({ ...current, content }))} readOnly={isDemo} />
+                <fieldset disabled={isDemo} className="min-w-0 space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div><label htmlFor="lesson-duration" className="field-label">زمان مطالعه (دقیقه)</label><input id="lesson-duration" type="number" min="1" max="999" value={lessonForm.duration_minutes} onChange={(event) => setLessonForm((current) => ({ ...current, duration_minutes: event.target.value }))} className="dashboard-input" dir="ltr" /></div>
                     <div><label htmlFor="lesson-status" className="field-label">وضعیت انتشار</label><select id="lesson-status" value={lessonForm.status} onChange={(event) => setLessonForm((current) => ({ ...current, status: event.target.value as LessonStatus }))} className="dashboard-input"><option value="draft">پیش‌نویس</option><option value="published">منتشرشده</option></select></div>

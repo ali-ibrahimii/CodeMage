@@ -8,7 +8,7 @@ const persianToLatin: Record<string, string> = {
   '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
 };
 
-export function slugify(value: string) {
+export function slugify(value: string, fallback = 'new-lesson') {
   const transliterated = Array.from(value.trim().normalize('NFKD'))
     .map((character) => persianToLatin[character] ?? character)
     .join('')
@@ -18,5 +18,5 @@ export function slugify(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-') || 'new-lesson';
+    .replace(/-{2,}/g, '-') || fallback;
 }
