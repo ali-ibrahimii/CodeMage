@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Session } from '@supabase/supabase-js';
 import {
@@ -240,27 +240,34 @@ export default function DashboardPage() {
     setAccess('admin');
   }, []);
 
+  const currentUserId = useRef<string | null>(null);
+
   useEffect(() => {
     if (!hasSupabaseConfig) return;
 
     let active = true;
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (!active) return;
-      setSession(currentSession);
-      setAuthReady(true);
-      setAccess(currentSession ? 'checking-role' : 'signed-out');
-    });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!active) return;
+
+      const nextUserId = nextSession?.user.id ?? null;
+      const userChanged = currentUserId.current !== nextUserId;
+      currentUserId.current = nextUserId;
+
       setSession(nextSession);
       setAuthReady(true);
-      setAccess(nextSession ? 'checking-role' : 'signed-out');
+
       if (!nextSession) {
+        setAccess('signed-out');
         setSubjects([]);
         setChapters([]);
         setLessons([]);
+        return;
       }
+
+      // Supabase emits SIGNED_IN again when a background tab becomes visible.
+      // A token refresh for the same user must not reset the dashboard to its
+      // loading screen; the current data and any open editor should stay put.
+      if (userChanged) setAccess('checking-role');
     });
 
     return () => {
