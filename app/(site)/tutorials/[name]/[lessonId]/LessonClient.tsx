@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import type { PublicLesson } from '@/lib/content';
+import { extractCode, markdownToHtml } from '@/lib/markdown';
 
 type Props = {
   lesson: PublicLesson;
@@ -24,72 +25,6 @@ type Props = {
   topicTitle: string;
   chapterTitle: string;
 };
-
-type CodeSnippet = {
-  language: string;
-  code: string;
-};
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-function extractCode(content: string): CodeSnippet[] {
-  const snippets: CodeSnippet[] = [];
-  const pattern = /```([\w-]+)?\s*\n([\s\S]*?)```/g;
-  let match = pattern.exec(content);
-  while (match) {
-    snippets.push({ language: match[1] || 'code', code: match[2].trimEnd() });
-    match = pattern.exec(content);
-  }
-  return snippets;
-}
-
-function markdownToHtml(markdown: string) {
-  const codeBlocks: string[] = [];
-  const withTokens = markdown.replace(/```([\w-]+)?\s*\n([\s\S]*?)```/g, (_match, language: string | undefined, code: string) => {
-    const index = codeBlocks.length;
-    const label = language || 'code';
-    codeBlocks.push(`<pre dir="ltr"><code class="language-${escapeHtml(label)}">${escapeHtml(code.trimEnd())}</code></pre>`);
-    return `\n\nCODEMAGEBLOCK${index}END\n\n`;
-  });
-
-  let safe = escapeHtml(withTokens);
-  safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
-  safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  safe = safe.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  safe = safe.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  safe = safe.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-
-  const blocks = safe.split(/\n{2,}/).map((block) => {
-    const trimmed = block.trim();
-    if (!trimmed) return '';
-    if (/^<h[1-3]>/.test(trimmed) || /^CODEMAGEBLOCK\d+END$/.test(trimmed)) return trimmed;
-
-    const lines = trimmed.split('\n');
-    if (lines.every((line) => /^&gt;\s?/.test(line))) {
-      return `<blockquote>${lines.map((line) => line.replace(/^&gt;\s?/, '')).join('<br/>')}</blockquote>`;
-    }
-
-    if (lines.every((line) => /^\s*[-*]\s+/.test(line))) {
-      return `<ul>${lines.map((line) => `<li>${line.replace(/^\s*[-*]\s+/, '')}</li>`).join('')}</ul>`;
-    }
-
-    if (lines.every((line) => /^\s*\d+\.\s+/.test(line))) {
-      return `<ol>${lines.map((line) => `<li>${line.replace(/^\s*\d+\.\s+/, '')}</li>`).join('')}</ol>`;
-    }
-
-    return `<p>${trimmed.replaceAll('\n', '<br/>')}</p>`;
-  }).join('\n');
-
-  return blocks.replace(/CODEMAGEBLOCK(\d+)END/g, (_match, index: string) => codeBlocks[Number(index)] || '');
-}
 
 function number(value: number) {
   return new Intl.NumberFormat('fa-IR').format(value);
