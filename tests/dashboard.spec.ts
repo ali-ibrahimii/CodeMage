@@ -83,7 +83,7 @@ for (const width of [320, 768, 1440]) {
     await expect(page.getByRole('button', { name: 'ذخیره‌ی متن‌های سایت' })).toBeDisabled();
 
     await navigation.getByRole('button', { name: 'مدیریت درس‌ها', exact: true }).click();
-    await expect(page.locator('article')).toHaveCount(3);
+    await expect(page.locator('article')).toHaveCount(7);
     await expect(page.locator('#lesson-title')).toHaveCount(0);
     await page.getByLabel('موضوع', { exact: true }).selectOption('demo-c');
     await expect(page.locator('article')).toHaveCount(1);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bold, CircleHelp, Code2, Eye, Hash, Heading, List, ListOrdered, PenLine, Quote } from 'lucide-react';
+import { Bold, CircleHelp, Code2, Eye, Hash, Heading, Image, List, ListOrdered, PenLine, Quote, SquareFunction, Workflow } from 'lucide-react';
 import {
   markdownToHtml,
   markLinesAsList,
@@ -28,6 +28,9 @@ const HELP_ITEMS: Array<{ title: string; sample: string; hint: string }> = [
   { title: 'متن پررنگ', sample: '**نکته‌ی مهم**', hint: 'دو ستاره قبل و بعد.' },
   { title: 'کادر نکته', sample: '> **نکته:** همیشه ورودی را بررسی کن.', hint: 'خط را با `>` شروع کن.' },
   { title: 'کد', sample: '```python\nprint("سلام")\n```', hint: 'سه بک‌تیک، نام زبان، کد، سه بک‌تیک.' },
+  { title: 'شکل و نمودار', sample: '```diagram flow\\nقدم اول -> قدم دوم\\n```', hint: 'سه نوع دارد: flow (جعبه و فلش، پیشفرض) ، steps (مراحل شماره‌دار) و plot (نمودار تابع مثل y = x^2).' },
+  { title: 'فرمول ریاضی', sample: '$$\\frac{1}{2} + x^2$$', hint: 'بین دو علامت دلار بنویس; $x^2$ برای داخل متن و $$...$$ برای فرمول جداگانه. کسر (\\frac) و جذر (\\sqrt) هم پشتیبانی می‌شود.' },
+  { title: 'عکس', sample: '![توضیح عکس](/media/pic.png)', hint: 'عکس آپلودشده در media یا هر آدرس دیگری; وقتی تنها در یک خط باشد، با توضیح زیرش نمایش داده می‌شود.' },
 ];
 
 export function MarkdownField({ id = 'lesson-content', value, onChange, readOnly = false, rows = 12 }: Props) {
@@ -72,6 +75,36 @@ export function MarkdownField({ id = 'lesson-content', value, onChange, readOnly
     });
   }
 
+  function insertBlock(template: string, selectStart: number, selectLength: number) {
+    const node = area();
+    if (!node || readOnly) return;
+    const start = node.selectionStart;
+    const end = node.selectionEnd;
+    const lead = start > 0 && value[start - 1] !== '\\n' ? '\\n\\n' : '';
+    const tail = end < value.length && value[end] !== '\\n' ? '\\n\\n' : '';
+    const block = lead + template + tail;
+    applyEdit({
+      value: `${value.slice(0, start)}${block}${value.slice(end)}`,
+      selectionStart: start + lead.length + selectStart,
+      selectionEnd: start + lead.length + selectStart + selectLength,
+    });
+  }
+
+  function insertDiagramBlock() {
+    const template = '```diagram flow\\nقدم اول -> قدم دوم -> قدم سوم\\n```';
+    insertBlock(template, 16, template.length - 22);
+  }
+
+  function insertMathBlock() {
+    const template = '$$\\frac{1}{2} + x^2$$';
+    insertBlock(template, 2, template.length - 4);
+  }
+
+  function insertImage() {
+    const template = '![توضیح عکس](/media/pic.png)';
+    insertBlock(template, 2, 9);
+  }
+
   function renumberHeadings() {
     if (readOnly) return;
     const next = numberHeadings(value, 2);
@@ -87,6 +120,9 @@ export function MarkdownField({ id = 'lesson-content', value, onChange, readOnly
     { label: 'فهرست نقطه‌ای', icon: List, run: () => editSelection((text, start, end) => markLinesAsList(text, start, end, 'ul')) },
     { label: 'کادر نکته', icon: Quote, run: () => editSelection((text, start, end) => prefixLines(text, start, end, '> ')) },
     { label: 'کد', icon: Code2, run: insertCodeBlock },
+    { label: 'شکل', icon: Workflow, run: insertDiagramBlock },
+    { label: 'فرمول', icon: SquareFunction, run: insertMathBlock },
+    { label: 'عکس', icon: Image, run: insertImage },
   ];
 
   return (

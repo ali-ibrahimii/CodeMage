@@ -1,11 +1,85 @@
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Check, Clock3, Compass, Layers3, Sparkles, Target } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import {
+  ArrowLeft,
+  Atom,
+  BookOpen,
+  Braces,
+  Check,
+  Clock3,
+  Compass,
+  Cpu,
+  Layers3,
+  Monitor,
+  Route,
+  Search,
+  Server,
+  Sigma,
+  Sparkles,
+  Target,
+  Terminal,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { getPublicSubject, getPublicSubjects } from '@/lib/content';
+import {
+  ROADMAP_CATEGORY_LABELS,
+  countRoadmapSteps,
+  getRoadmaps,
+  type Roadmap,
+} from '@/lib/roadmaps';
+import RoadmapSearch from '@/components/home/RoadmapSearch';
 
 export const dynamic = 'force-dynamic';
 
+const iconByName: Record<string, LucideIcon> = {
+  Monitor, Server, Terminal, Braces, Cpu, Sigma, Atom, BookOpen, Compass,
+};
+
 function faNumber(value: number) {
   return new Intl.NumberFormat('fa-IR').format(value);
+}
+
+const roadmapColors: Record<string, { first: string; second: string; ink: string }> = {
+  violet: { first: '#e1d4ff', second: '#f3ecff', ink: '#7c5bd5' },
+  emerald: { first: '#c9efd8', second: '#e7f8ed', ink: '#298b5c' },
+  yellow: { first: '#f8e6ae', second: '#fcf5dc', ink: '#af842a' },
+  blue: { first: '#cad8ff', second: '#eaf0ff', ink: '#5366d8' },
+};
+
+function RoadmapCard({ roadmap }: { roadmap: Roadmap }) {
+  const Icon = iconByName[roadmap.icon] || Compass;
+  const colorset = roadmapColors[roadmap.color] || roadmapColors.violet;
+  const steps = countRoadmapSteps(roadmap);
+  return (
+    <Link href={`/learning-paths/${roadmap.slug}`} className="group block h-full">
+      <article className="soft-card card-hover flex h-full flex-col overflow-hidden">
+        <div className="relative flex h-36 shrink-0 items-center justify-between overflow-hidden px-6" style={{ '--art-start': colorset.first, '--art-end': colorset.second } as CSSProperties}>
+          <div className="subject-art absolute inset-0" />
+          <span className="relative z-10 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{ROADMAP_CATEGORY_LABELS[roadmap.category]}</span>
+          <span className="relative z-10 flex size-16 items-center justify-center rounded-[1.4rem] border border-white/70 bg-white/75 shadow-lg shadow-slate-500/10 backdrop-blur" style={{ '--topic-icon': colorset.ink } as CSSProperties}>
+            <Icon size={30} strokeWidth={1.7} className="text-[color:var(--topic-icon)]" />
+          </span>
+          <span className="absolute bottom-4 right-6 z-10 rounded-full border border-white/60 bg-white/65 px-3 py-1 text-[11px] font-bold text-slate-700 backdrop-blur">{roadmap.level}</span>
+        </div>
+        <div className="flex flex-1 flex-col p-5 sm:p-6">
+          <h3 className="text-xl font-black tracking-tight text-foreground transition-colors group-hover:text-primary">{roadmap.title}</h3>
+          <p className="mt-2 line-clamp-2 min-h-12 text-sm leading-6 text-muted-foreground">{roadmap.description}</p>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {roadmap.stages.slice(0, 3).map((stage) => (
+              <span key={stage.title} className="rounded-full bg-primary/[0.07] px-2.5 py-1 text-[10px] font-bold text-primary">{stage.title}</span>
+            ))}
+            {roadmap.stages.length > 3 && <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold text-muted-foreground">+{faNumber(roadmap.stages.length - 3)} مرحله‌ی دیگر</span>}
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4 text-xs font-bold text-muted-foreground">
+            <span className="flex items-center gap-1.5"><Layers3 size={14} /> {faNumber(roadmap.stages.length)} مرحله</span>
+            <span className="flex items-center gap-1.5"><Route size={14} /> {faNumber(steps)} گام</span>
+            <span className="flex items-center gap-1.5"><Clock3 size={14} /> ~{faNumber(roadmap.estimatedHours)} ساعت</span>
+            <span className="flex items-center gap-1 text-primary transition-transform group-hover:-translate-x-1">دیدن نقشه <ArrowLeft size={14} /></span>
+          </div>
+        </div>
+      </article>
+    </Link>
+  );
 }
 
 export default async function LearningPathsPage() {
@@ -14,6 +88,8 @@ export default async function LearningPathsPage() {
     subject,
     content: await getPublicSubject(subject.slug),
   })));
+  const roadmaps = getRoadmaps();
+  const categories: Array<Roadmap['category']> = ['programming', 'science'];
 
   return (
     <div className="page-container page-shell" dir="rtl">
@@ -24,13 +100,16 @@ export default async function LearningPathsPage() {
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-2 text-xs font-bold text-white/80"><Compass size={14} className="text-[#b7f486]" /> نقشه‌ی راه تو</span>
             <h1 className="mt-5 max-w-2xl page-heading">یادگیریِ هدفمند، با مسیر روشن</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-8 text-white/65 sm:text-base">هر موضوع را به فصل‌های کوتاه و قابل‌پیشرفت تقسیم کرده‌ایم. از اولین قدم شروع کن و با ریتم خودت جلو برو.</p>
+            <p className="mt-4 max-w-2xl text-sm leading-8 text-white/65 sm:text-base">هر موضوع را به فصل‌های کوتاه و قابل‌پیشرفت تقسیم کرده‌ایم. زبان یا موضوع مورد نظرت را بنویس تا مستقیم به نقشه‌ی راهش بروی.</p>
+            <div className="mt-6">
+              <RoadmapSearch />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur">
               <span className="flex size-10 items-center justify-center rounded-xl bg-violet-300/15 text-violet-200"><Layers3 size={19} /></span>
-              <span className="mt-4 block text-2xl font-black">{faNumber(subjects.length)}</span>
-              <span className="mt-1 block text-xs font-semibold text-white/55">مسیر برای انتخاب</span>
+              <span className="mt-4 block text-2xl font-black">{faNumber(roadmaps.length)}</span>
+              <span className="mt-1 block text-xs font-semibold text-white/55">نقشه‌ی راه آماده</span>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur">
               <span className="flex size-10 items-center justify-center rounded-xl bg-[#b7f486]/15 text-[#b7f486]"><Target size={19} /></span>
@@ -41,11 +120,41 @@ export default async function LearningPathsPage() {
         </div>
       </section>
 
-      <section className="mt-12">
+      <section id="roadmap-catalog" className="mt-12">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <span className="section-kicker"><Sparkles size={14} /> نقشه‌ی راه‌های آماده</span>
+            <h2 className="section-title">برنامه‌نویسی و علوم، مسیر به مسیر</h2>
+            <p className="section-copy">از فرانت‌اند و بک‌اند تا زبان‌های برنامه‌نویسی و درس‌هایی مثل ریاضی و فیزیک — هر مسیر به گام‌های کوچک و روشن تقسیم شده است.</p>
+          </div>
+          <span className="inline-flex items-center gap-2 self-start rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-bold text-muted-foreground"><Search size={14} className="text-primary" /> نام زبان یا موضوع را جست‌وجو کن</span>
+        </div>
+
+        {categories.map((category) => {
+          const items = roadmaps.filter((roadmap) => roadmap.category === category);
+          return (
+            <div key={category} className="mt-8">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3.5 py-1.5 text-xs font-black text-primary">
+                  {category === 'programming' ? <Braces size={13} /> : <Atom size={13} />}
+                  {ROADMAP_CATEGORY_LABELS[category]}
+                </span>
+                <span className="h-px flex-1 bg-border/70" />
+                <span className="text-[11px] font-bold text-muted-foreground">{faNumber(items.length)} مسیر</span>
+              </div>
+              <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((roadmap) => <RoadmapCard key={roadmap.slug} roadmap={roadmap} />)}
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="mt-14">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <span className="section-kicker"><Sparkles size={14} /> مسیرهای پیشنهادی</span>
-            <h2 className="section-title">بر اساس موضوع مورد علاقه‌ات</h2>
+            <h2 className="section-title">بر اساس درس‌های منتشرشده‌ی سایت</h2>
             <p className="section-copy">این نقشه‌ها از فصل‌ها و درس‌های منتشرشده‌ی سایت ساخته می‌شوند و با محتوای تازه به‌روز می‌مانند.</p>
           </div>
           <Link href="/tutorials" className="inline-flex items-center gap-2 self-start rounded-xl px-2 py-3 text-sm font-extrabold text-primary transition hover:gap-3 sm:self-auto">همه‌ی موضوع‌ها <ArrowLeft size={16} /></Link>
@@ -73,7 +182,10 @@ export default async function LearningPathsPage() {
                           <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{subject.description || `مسیر یادگیری ${subject.title}، از پایه تا قدم‌های پیشرفته‌تر.`}</p>
                         </div>
                       </div>
-                      <Link href={firstLesson ? `/tutorials/${subject.slug}/${firstLesson.slug}` : `/tutorials/${subject.slug}`} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground transition hover:gap-3">شروع مسیر <ArrowLeft size={14} /></Link>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={firstLesson ? `/tutorials/${subject.slug}/${firstLesson.slug}` : `/tutorials/${subject.slug}`} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground transition hover:gap-3">شروع مسیر <ArrowLeft size={14} /></Link>
+                        <Link href={`/learning-paths/${subject.slug}`} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/25 bg-card/70 px-4 py-2.5 text-xs font-black text-primary transition hover:gap-3">نقشه‌ی راه <Route size={14} /></Link>
+                      </div>
                     </div>
                     <div className="mt-6 flex flex-wrap gap-2 border-t border-primary/10 pt-4 text-xs font-bold text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-card/75 px-3 py-1.5"><Layers3 size={13} className="text-primary" /> {faNumber(stepCount)} فصل</span>
@@ -130,8 +242,8 @@ export default async function LearningPathsPage() {
 
       <section className="mt-12 grid gap-4 rounded-3xl sm:rounded-[2rem] border border-border/70 bg-card p-6 sm:grid-cols-3 sm:p-8">
         {[
-          { title: 'یک موضوع انتخاب کن', text: 'از میان موضوع‌های در دسترس، مورد علاقه‌ات را بردار.', icon: Compass },
-          { title: 'فصل‌ها را دنبال کن', text: 'محتوا به بخش‌های کوچک تقسیم شده تا راحت‌تر پیش بروی.', icon: Layers3 },
+          { title: 'یک موضوع انتخاب کن', text: 'نام زبان یا موضوع را بنویس تا نقشه‌ی راهش جلوی چشمت باشد.', icon: Compass },
+          { title: 'مراحل را دنبال کن', text: 'هر مسیر به مراحل کوچک تقسیم شده تا راحت‌تر پیش بروی.', icon: Layers3 },
           { title: 'با تمرین تثبیت کن', text: 'مثال‌ها را خودت اجرا کن و آموخته‌ها را مرور کن.', icon: Target },
         ].map((item, index) => {
           const Icon = item.icon;

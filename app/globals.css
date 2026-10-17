@@ -375,6 +375,99 @@
   line-height: 1.8;
 }
 
+.lesson-prose .lesson-figure {
+  margin: 1.6rem 0;
+  text-align: center;
+}
+
+.lesson-prose .lesson-figure img {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 1.15rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.lesson-prose .lesson-figure figcaption {
+  margin-top: 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+
+.lesson-prose .lesson-inline-image {
+  display: inline-block;
+  max-height: 2.2rem;
+  vertical-align: middle;
+  border-radius: 0.45rem;
+}
+
+.lesson-prose .lesson-diagram {
+  overflow-x: auto;
+}
+
+.lesson-prose .lesson-diagram-svg {
+  display: block;
+  width: 100%;
+  min-width: 300px;
+  height: auto;
+  margin-inline: auto;
+}
+
+.lesson-prose .lesson-math {
+  font-family: "Vazirmatn", "Times New Roman", serif;
+  font-size: 1.08em;
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+
+.lesson-prose .lesson-math-block {
+  display: block;
+  margin: 1.4rem 0;
+  padding: 0.9rem 1.1rem;
+  text-align: center;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--primary) 5%, var(--card));
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.lesson-math sup,
+.lesson-math sub {
+  font-size: 0.72em;
+  line-height: 0;
+}
+
+.math-frac {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  margin-inline: 0.18em;
+}
+
+.math-frac-top {
+  border-bottom: 1.5px solid currentColor;
+  padding: 0 0.35em 0.08em;
+}
+
+.math-frac-bottom {
+  padding: 0.08em 0.35em 0;
+}
+
+.math-sqrt {
+  display: inline-flex;
+  align-items: flex-start;
+}
+
+.math-sqrt-body {
+  border-top: 1.5px solid currentColor;
+  padding: 0.05em 0.25em 0 0.15em;
+  margin-top: 0.12em;
+}
+
 .dashboard-nav-item {
   @apply flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-right text-sm font-bold text-muted-foreground transition;
 }

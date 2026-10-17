@@ -7,17 +7,22 @@ import {
   Braces,
   Clock3,
   Code2,
+  Compass,
+  Cpu,
   Layers3,
+  Route,
   Search,
   Sigma,
   Sparkles,
+  Terminal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { getPublicLessonIndex, getPublicSubjects } from '@/lib/content';
+import { bestRoadmapMatch } from '@/lib/roadmaps';
 
 export const dynamic = 'force-dynamic';
 
-const iconByName: Record<string, LucideIcon> = { Braces, Code2, Atom, Sigma, BookOpen };
+const iconByName: Record<string, LucideIcon> = { Braces, Code2, Atom, Sigma, BookOpen, Terminal, Cpu };
 const colors: Record<string, { first: string; second: string; ink: string }> = {
   blue: { first: '#cad8ff', second: '#eaf0ff', ink: '#5366d8' },
   cyan: { first: '#c4f2ed', second: '#e5faf7', ink: '#229b94' },
@@ -42,6 +47,7 @@ export default async function TutorialsPage({
   ]);
   const query = (Array.isArray(q) ? q[0] : q || '').trim();
   const needle = query.toLocaleLowerCase('fa-IR');
+  const roadmapMatch = query ? bestRoadmapMatch(query) : null;
   const visibleSubjects = query
     ? subjects.filter((subject) => `${subject.title} ${subject.description || ''} ${subject.slug}`.toLocaleLowerCase('fa-IR').includes(needle))
     : subjects;
@@ -69,6 +75,17 @@ export default async function TutorialsPage({
           </form>
         </div>
       </section>
+
+      {roadmapMatch && (
+        <Link href={`/learning-paths/${roadmapMatch.slug}`} className="group mt-7 flex flex-wrap items-center gap-4 rounded-3xl border border-primary/25 bg-primary/[0.06] p-5 transition hover:border-primary/45 hover:bg-primary/[0.09] sm:px-7">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><Route size={21} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-xs font-black text-primary"><Compass size={13} /> نقشه‌ی راه پیشنهادی</span>
+            <span className="mt-1 block text-sm font-bold text-foreground sm:text-base">به نظر می‌رسد دنبال نقشه‌ی راه «{roadmapMatch.title}» هستی — مراحل، گام‌ها و ترتیب یادگیری را یک‌جا ببین.</span>
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground transition group-hover:gap-3">دیدن نقشه‌ی راه <ArrowLeft size={14} /></span>
+        </Link>
+      )}
 
       <div className="mt-9 flex flex-wrap items-center justify-between gap-3">
         <div>

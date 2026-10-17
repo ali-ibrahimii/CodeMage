@@ -4,6 +4,7 @@ import {
   markLinesAsList,
   numberHeadings,
   prefixLines,
+  renderMathHtml,
   wrapSelection,
 } from '../lib/markdown';
 
@@ -73,4 +74,51 @@ test('toolbar helpers edit the touched lines and the selection', () => {
   const bold = wrapSelection('نکته', 0, 4, '**', '**', 'متن مهم');
   expect(bold.value).toBe('**نکته**');
   expect([bold.selectionStart, bold.selectionEnd]).toEqual([2, 6]);
+});
+
+test('inline and display math render as HTML without extra libraries', () => {
+  expect(renderMathHtml('x^2 + 3x_1')).toBe('<span class="lesson-math" dir="ltr">x<sup>2</sup> + 3x<sub>1</sub></span>');
+  expect(renderMathHtml('\\frac{1}{2}')).toContain('math-frac-top');
+  expect(renderMathHtml('\\sqrt{x}')).toContain('math-sqrt');
+  expect(renderMathHtml('F = m \\times a')).toContain('F = m × a');
+
+  const inline = markdownToHtml('مساحت برابر است با $a^2$.');
+  expect(inline).toContain('<span class="lesson-math" dir="ltr">a<sup>2</sup></span>');
+  expect(inline).toContain('مساحت برابر است با');
+
+  const display = markdownToHtml('$$\\int_0^1 x\\,dx$$');
+  expect(display).toContain('class="lesson-math lesson-math-block"');
+  expect(display).not.toContain('<p>');
+
+  // Dollars inside inline code stay literal.
+  expect(markdownToHtml('`$x$`')).toBe('<p><code>$x$</code></p>');
+});
+
+test('images become figures alone on a line and inline images inside text', () => {
+  const figure = markdownToHtml('![نمودار سهمی](/media/parabola.png)');
+  expect(figure).toContain('<figure class="lesson-figure">');
+  expect(figure).toContain('<img src="/media/parabola.png" alt="نمودار سهمی"');
+  expect(figure).toContain('<figcaption>نمودار سهمی</figcaption>');
+
+  const inline = markdownToHtml('این عکس ![کوچک](/a.png) داخل متن است.');
+  expect(inline).toContain('<img class="lesson-inline-image" src="/a.png" alt="کوچک"');
+  expect(inline).not.toContain('<figure');
+});
+
+test('diagram fences render deterministic SVG figures', () => {
+  const flow = markdownToHtml('```diagram flow\nشروع -> اجرا\n```');
+  expect(flow).toContain('<figure class="lesson-figure lesson-diagram">');
+  expect(flow).toContain('<svg');
+  expect(flow).toContain('شروع');
+  expect(flow).toContain('marker-end');
+
+  const steps = markdownToHtml('```diagram steps\nنصب | از سایت رسمی\n```');
+  expect(steps).toContain('<circle');
+
+  const plot = markdownToHtml('```diagram plot\ny = x^2\ndomain: -2..2\n```');
+  expect(plot).toContain('<svg');
+  expect(plot).toContain('y = x^2');
+
+  // Diagram fences never leak into the code-snippet tab.
+  expect(markdownToHtml('```diagram\nA -> B\n```')).toContain('<svg');
 });
