@@ -1,5 +1,9 @@
 // A tiny Persian-first Markdown renderer shared by the public lesson page and
 // the dashboard editor preview, so what the author writes is what the reader sees.
+// Besides headings/lists/quotes/code it understands lesson extras: images,
+// light-weight math ($x^2$, $$…$$) and ` ```diagram ` figures (SVG, no deps).
+
+import { diagramToSvg } from './diagram';
 
 export type CodeSnippet = {
   language: string;
@@ -7,8 +11,10 @@ export type CodeSnippet = {
 };
 
 const PERSIAN_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-const CODE_FENCE = /```([\w+#-]+)?[ \t]*\r?\n([\s\S]*?)```/g;
-const CODE_TOKEN = /^CODEMAGEBLOCK(\d+)END$/;
+// The info string may carry an extra kind word (`diagram flow` / `diagram plot`).
+const CODE_FENCE = /```([\w+#-]+(?:[ \t]+[\w-]+)?)?[ \t]*\r?\n([\s\S]*?)```/g;
+const TOKEN_PATTERN = /CODEMAGE(BLOCK|MATH|IMG|INLINE)(\d+)END/g;
+const CODE_TOKEN = /^CODEMAGE(BLOCK|MATH|IMG|INLINE)(\d+)END$/;
 const HEADING_LINE = /^<h([1-6])>[\s\S]*<\/h[1-6]>$/;
 const QUOTE_LINE = /^&gt;[ \t]?(.*)$/;
 // `۱.` / `1)` / `۱٫` all start a numbered item; the digit lookahead keeps decimals such as `3.14` as text.
@@ -36,12 +42,153 @@ export function toPersianDigits(value: number | string) {
   return String(value).replace(/\d/g, (digit) => PERSIAN_DIGITS[Number(digit)]);
 }
 
+// ── Math: `$x^2$` inline and `$$…$$` display, rendered to HTML (no KaTeX) ──
+
+const MATH_SYMBOLS: Array<[RegExp, string]> = [
+  [/\\leftarrow/g, '←'],
+  [/\\to|\\rightarrow/g, '→'],
+  [/\\Rightarrow/g, '⇒'],
+  [/\\times/g, '×'],
+  [/\\div/g, '÷'],
+  [/\\cdot/g, '·'],
+  [/\\pm/g, '±'],
+  [/\\leq?/g, '≤'],
+  [/\\geq?/g, '≥'],
+  [/\\neq?/g, '≠'],
+  [/\\approx/g, '≈'],
+  [/\\equiv/g, '≡'],
+  [/\\infty/g, '∞'],
+  [/\\partial/g, '∂'],
+  [/\\nabla/g, '∇'],
+  [/\\int/g, '∫'],
+  [/\\sum/g, '∑'],
+  [/\\prod/g, '∏'],
+  [/\\pi/g, 'π'],
+  [/\\alpha/g, 'α'],
+  [/\\beta/g, 'β'],
+  [/\\gamma/g, 'γ'],
+  [/\\theta/g, 'θ'],
+  [/\\lambda/g, 'λ'],
+  [/\\mu/g, 'μ'],
+  [/\\sigma/g, 'σ'],
+  [/\\phi/g, 'φ'],
+  [/\\omega/g, 'ω'],
+  [/\\Delta/g, 'Δ'],
+  [/\\lim/g, 'lim'],
+  [/\\sin/g, 'sin'],
+  [/\\cos/g, 'cos'],
+  [/\\tan/g, 'tan'],
+  [/\\log/g, 'log'],
+  [/\\ln/g, 'ln'],
+  [/\\left\(/g, '('],
+  [/\\right\)/g, ')'],
+  [/\\left\[/g, '['],
+  [/\\right\]/g, ']'],
+  [/\\,/g, '&#8201;'],
+  [/\\;/g, '&nbsp;'],
+  [/\\quad/g, '&nbsp;&nbsp;&nbsp;&nbsp;'],
+  [/\\ /g, '&nbsp;'],
+];
+
+/** Pulls one balanced `{…}` group off `text` starting at `start`; returns inner content + end index. */
+function readBraceGroup(text: string, start: number): { inner: string; end: number } | null {
+  if (text[start] !== '{') return null;
+  let depth = 0;
+  for (let index = start; index < text.length; index += 1) {
+    if (text[index] === '{') depth += 1;
+    else if (text[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return { inner: text.slice(start + 1, index), end: index + 1 };
+    }
+  }
+  return null;
+}
+
+function replaceCommandGroups(html: string, command: string, wrap: (inner: string) => string): string {
+  let result = html;
+  for (let at = result.indexOf(command); at !== -1; at = result.indexOf(command, at)) {
+    const group = readBraceGroup(result, at + command.length);
+    if (!group) {
+      at += command.length;
+      continue;
+    }
+    const replacement = wrap(replaceCommandGroups(group.inner, command, wrap));
+    result = `${result.slice(0, at)}${replacement}${result.slice(group.end)}`;
+    at += replacement.length;
+  }
+  return result;
+}
+
+/** `\frac{a}{b}` takes two brace groups; nested fractions recurse. */
+function replaceFractions(html: string): string {
+  let result = html;
+  for (let at = result.indexOf('\\frac'); at !== -1; at = result.indexOf('\\frac', at)) {
+    const numerator = readBraceGroup(result, at + 5);
+    const denominator = numerator ? readBraceGroup(result, numerator.end) : null;
+    if (!numerator || !denominator) {
+      at += 5;
+      continue;
+    }
+    const replacement = `<span class="math-frac"><span class="math-frac-top">${replaceFractions(numerator.inner)}</span><span class="math-frac-bottom">${replaceFractions(denominator.inner)}</span></span>`;
+    result = `${result.slice(0, at)}${replacement}${result.slice(denominator.end)}`;
+    at += replacement.length;
+  }
+  return result;
+}
+
+function replaceScripts(html: string, marker: '^' | '_', tag: 'sup' | 'sub'): string {
+  let result = '';
+  let index = 0;
+  while (index < html.length) {
+    const character = html[index];
+    if (character !== marker || index === 0) {
+      result += character;
+      index += 1;
+      continue;
+    }
+    let inner: string;
+    if (html[index + 1] === '{') {
+      const group = readBraceGroup(html, index + 1);
+      if (!group) {
+        result += character;
+        index += 1;
+        continue;
+      }
+      inner = group.inner;
+      index = group.end;
+    } else if (html[index + 1] && html[index + 1] !== ' ') {
+      inner = html[index + 1];
+      index += 2;
+    } else {
+      result += character;
+      index += 1;
+      continue;
+    }
+    result += `<${tag}>${inner}</${tag}>`;
+  }
+  return result;
+}
+
+/** `lim_{x → 0}` and `x^2` walk through `x_{0}^{2}` safely because each pass re-scans. */
+export function renderMathHtml(source: string, display = false): string {
+  let html = escapeHtml(source.trim());
+  html = replaceFractions(html);
+  html = replaceCommandGroups(html, '\\sqrt', (inner) => `<span class="math-sqrt">√<span class="math-sqrt-body">${inner}</span></span>`);
+  html = replaceScripts(html, '^', 'sup');
+  html = replaceScripts(html, '_', 'sub');
+  for (const [pattern, symbol] of MATH_SYMBOLS) html = html.replace(pattern, symbol);
+  html = html.replace(/\\([a-zA-Z]+)/g, '$1');
+  const className = display ? 'lesson-math lesson-math-block' : 'lesson-math';
+  return `<span class="${className}" dir="ltr">${html}</span>`;
+}
+
 export function extractCode(content: string): CodeSnippet[] {
   const snippets: CodeSnippet[] = [];
   const pattern = new RegExp(CODE_FENCE.source, 'g');
   let match = pattern.exec(content);
   while (match) {
-    snippets.push({ language: match[1] || 'code', code: match[2].trimEnd() });
+    const language = (match[1] || 'code').toLowerCase();
+    if (!language.startsWith('diagram')) snippets.push({ language: match[1] || 'code', code: match[2].trimEnd() });
     match = pattern.exec(content);
   }
   return snippets;
@@ -93,16 +240,44 @@ function renderList(items: ListLine[], position: number, indent: number, continu
 }
 
 export function markdownToHtml(markdown: string) {
-  const codeBlocks: string[] = [];
-  const withTokens = markdown.replace(CODE_FENCE, (_match, language: string | undefined, code: string) => {
-    const index = codeBlocks.length;
-    const label = language || 'code';
-    codeBlocks.push(`<pre dir="ltr"><code class="language-${escapeHtml(label)}">${escapeHtml(code.trimEnd())}</code></pre>`);
-    return `\n\nCODEMAGEBLOCK${index}END\n\n`;
+  const assets: Record<'BLOCK' | 'MATH' | 'IMG' | 'INLINE', string[]> = { BLOCK: [], MATH: [], IMG: [], INLINE: [] };
+  const stash = (kind: 'BLOCK' | 'MATH' | 'IMG' | 'INLINE', html: string) => {
+    assets[kind].push(html);
+    return `CODEMAGE${kind}${assets[kind].length - 1}END`;
+  };
+
+  // Fenced code becomes <pre>; ```diagram fences become inline SVG figures.
+  const withFences = markdown.replace(CODE_FENCE, (_match, language: string | undefined, code: string) => {
+    const label = (language || 'code').toLowerCase();
+    const body = code.trimEnd();
+    if (label === 'diagram' || label.startsWith('diagram ') || label.startsWith('diagram-')) {
+      const kind = label.replace(/^diagram[-\s]?/, '');
+      const svg = diagramToSvg(body, kind || undefined);
+      return `\n\n${stash('BLOCK', `<figure class="lesson-figure lesson-diagram">${svg}</figure>`)}\n\n`;
+    }
+    return `\n\n${stash('BLOCK', `<pre dir="ltr"><code class="language-${escapeHtml(label)}">${escapeHtml(body)}</code></pre>`)}\n\n`;
   });
 
-  let safe = escapeHtml(withTokens);
-  safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Inline code first (so `$x$` and `$$` inside code stay literal), then display
+  // math, then inline math and images; everything becomes a restorable token.
+  const withInlineCode = withFences.replace(/`([^`]+)`/g, (_match, code: string) => stash('INLINE', `<code>${escapeHtml(code)}</code>`));
+  const withMath = withInlineCode.replace(/\$\$([\s\S]+?)\$\$/g, (_match, tex: string) => `\n\n${stash('MATH', renderMathHtml(tex, true))}\n\n`);
+  const withInlineMath = withMath.replace(/\$([^$\n]+)\$/g, (_match, tex: string) => stash('INLINE', renderMathHtml(tex)));
+  const withImages = withInlineMath.replace(
+    /!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"([^"]*)")?\s*\)/g,
+    (match: string, alt: string, src: string, title: string | undefined, offset: number, whole: string) => {
+      const caption = (title || alt || '').trim();
+      const before = whole.slice(0, offset);
+      const after = whole.slice(offset + match.length);
+      const aloneOnLine = (before === '' || before.endsWith('\n')) && (after === '' || after.startsWith('\n'));
+      const figure = aloneOnLine
+        ? `<figure class="lesson-figure"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt || caption)}" loading="lazy" />${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ''}</figure>`
+        : `<img class="lesson-inline-image" src="${escapeHtml(src)}" alt="${escapeHtml(alt || caption)}" loading="lazy" />`;
+      return stash('IMG', figure);
+    },
+  );
+
+  let safe = escapeHtml(withImages);
   safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
   safe = safe.replace(/^###### (.+)$/gm, '<h6>$1</h6>');
@@ -118,7 +293,26 @@ export function markdownToHtml(markdown: string) {
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
-    blocks.push(`<p>${paragraph.map((line) => line.trim()).join('<br/>')}</p>`);
+    // A line that is only a figure/math token becomes its own block, not <p> content.
+    const chunks: string[] = [];
+    let textLines: string[] = [];
+    const flushText = () => {
+      if (!textLines.length) return;
+      chunks.push(`<p>${textLines.map((line) => line.trim()).join('<br/>')}</p>`);
+      textLines = [];
+    };
+    for (const line of paragraph) {
+      const trimmed = line.trim();
+      const token = CODE_TOKEN.exec(trimmed);
+      if (token && (token[1] === 'MATH' || token[1] === 'IMG')) {
+        flushText();
+        chunks.push(trimmed);
+      } else {
+        textLines.push(line);
+      }
+    }
+    flushText();
+    if (chunks.length) blocks.push(...chunks);
     paragraph = [];
     orderedRunEnd = 0;
   };
@@ -137,7 +331,7 @@ export function markdownToHtml(markdown: string) {
       continue;
     }
 
-    const codeToken = CODE_TOKEN.exec(trimmed);
+    const codeToken = /^CODEMAGEBLOCK(\d+)END$/.exec(trimmed);
     if (codeToken) {
       flushParagraph();
       blocks.push(trimmed);
@@ -189,7 +383,7 @@ export function markdownToHtml(markdown: string) {
 
   return blocks
     .join('\n')
-    .replace(/CODEMAGEBLOCK(\d+)END/g, (_match, token: string) => codeBlocks[Number(token)] || '');
+    .replace(TOKEN_PATTERN, (_match, kind: 'BLOCK' | 'MATH' | 'IMG' | 'INLINE', index: string) => assets[kind][Number(index)] || '');
 }
 
 /** `## عنوان` → `## ۱. عنوان`; existing numbers are replaced, not doubled. */

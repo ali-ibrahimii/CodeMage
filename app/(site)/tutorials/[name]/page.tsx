@@ -8,18 +8,22 @@ import {
   CheckCircle2,
   Clock3,
   Code2,
+  Cpu,
   GraduationCap,
   Layers3,
+  Monitor,
   Play,
+  Server,
   Sigma,
   Sparkles,
+  Terminal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { getPublicSubject } from '@/lib/content';
 
 export const dynamic = 'force-dynamic';
 
-const iconByName: Record<string, LucideIcon> = { Braces, Code2, Atom, Sigma, BookOpen, GraduationCap };
+const iconByName: Record<string, LucideIcon> = { Braces, Code2, Atom, Sigma, BookOpen, GraduationCap, Terminal, Cpu, Monitor, Server };
 
 function number(value: number) {
   return new Intl.NumberFormat('fa-IR').format(value);
